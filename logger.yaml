@@ -1,0 +1,53 @@
+esphome:
+  name: serial_logger_s3
+
+esp32:
+  variant: esp32s3
+  board: esp32-s3-devkitc-1 # Or your specific ESP32-S3 board
+  framework:
+    type: esp-idf
+
+# Enable logging over the serial port you use for flashing
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    password: "8367"
+
+wifi: 
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: ${name}
+    password: !secret wifi_password
+
+uart:
+  - id: serial_input_1
+    rx_pin: GPIO6 # Replace with the actual RX pin for your first serial device
+    baud_rate: 9600
+    debug:
+      direction: BOTH
+      dummy_receiver: true
+      after:
+        delimiter: [0xAA]
+      sequence:
+        - lambda: UARTDebug::log_hex(uart::UART_DIRECTION_RX, bytes, ' ');
+
+
+  - id: serial_input_2
+    rx_pin: GPIO7 # Replace with the actual RX pin for your second serial device
+    baud_rate: 9600
+    debug:
+      direction: BOTH
+      dummy_receiver: true
+      after:
+        delimiter: [0x55]
+      sequence:
+        - lambda: UARTDebug::log_hex(uart::UART_DIRECTION_TX, bytes, ' ');

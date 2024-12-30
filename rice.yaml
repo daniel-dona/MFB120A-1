@@ -21,8 +21,6 @@ esp32:
       ignore_efuse_mac_crc: true
       ignore_efuse_custom_mac: true
 
-
-
 # Make sure logging is not using the serial port
 logger:
 
@@ -53,4 +51,56 @@ uart:
     baud_rate: 9600
 
 ricecooker:
+  id: ricecooker_id
   uart_id: uart_bus
+
+
+switch:
+  - platform: template
+    name: "Power"
+    id: power_switch
+    icon: mdi:power
+    lambda: |-
+      return id(ricecooker_id).get_power();
+    turn_on_action:
+      - lambda:
+          id(ricecooker_id).power_on();
+    turn_off_action:
+      - lambda:
+          id(ricecooker_id).power_off();
+
+sensor:
+  - platform: template
+    name: "Top sensor temperature"
+    lambda: |-
+      return id(ricecooker_id).get_top_temperature();
+    update_interval: 1s
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+
+
+  - platform: template
+    name: "Bottom sensor temperature"
+    lambda: |-
+      return id(ricecooker_id).get_bottom_temperature();
+    update_interval: 1s
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    device_class: temperature
+    state_class: measurement
+
+number:
+  - platform: template
+    id: target_temperature
+    name: "Target temperature"
+    icon: mdi:thermometer
+    min_value: 0
+    max_value: 120
+    mode: slider
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          id(ricecooker_id).set_temperature(x);

@@ -74,6 +74,22 @@ namespace ricecooker {
         }
     }
 
+    uint8_t RiceCooker::get_top_temperature(){
+        return recv_buffer[3];
+    }
+
+    uint8_t RiceCooker::get_bottom_temperature(){
+        return recv_buffer[4];
+    }
+
+    bool RiceCooker::get_power(){
+        return this->power;
+    }
+
+    void RiceCooker::set_temperature(uint8_t temperature){
+        this->target_temperature = temperature;
+    }
+
     void RiceCooker::write_data(uint8_t *buffer){
 
         buffer[0] = 0x55; // Header
@@ -220,6 +236,18 @@ namespace ricecooker {
 
     }
 
+    void RiceCooker::update(){
+
+        if (this->top_temperature_ != nullptr){
+            this->top_temperature_->publish_state(this->top_temperature);
+        }
+
+        if (this->bottom_temperature_ != nullptr){
+            this->bottom_temperature_->publish_state(this->bottom_temperature);
+        }
+
+    }
+
     void RiceCooker::loop() {
 
         if (millis() > mcu_last + mcu_interval){
@@ -238,7 +266,7 @@ namespace ricecooker {
 
             relay_last = millis();
 
-            this->manual_temperature_set(60);
+            this->manual_temperature_set(this->target_temperature);
 
         }
 
