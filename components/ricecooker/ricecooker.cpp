@@ -384,6 +384,8 @@ namespace ricecooker {
         auto bottom_temp = ricecooker->get_bottom_temperature();
         auto top_temp = ricecooker->get_top_temperature();
 
+        int target;
+
         switch (this->stage) {
 
             case Wait:
@@ -397,23 +399,27 @@ namespace ricecooker {
 
             case Soak:
 
+                target = 65;
+
                 if (now > stage_started + 45 * 60 * 1000 || this->fast) {
                     set_stage(Heat);
                 }
 
-                ESP_LOGD(TAG, "Rice: Soaking, Temperature: top: %dºC, bottom: %dºC, target: 65ºC",
-                    top_temp, bottom_temp);
+                ESP_LOGD(TAG, "Rice: Soaking, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
+                    top_temp, bottom_temp, target);
 
-                ricecooker->power_module(65, 5);
+                ricecooker->power_module(target, 5);
 
                 break;
 
             case Heat:
 
-                ESP_LOGD(TAG, "Rice: Heating, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
-                    top_temp, bottom_temp, cooking_temp);
+                target = 97;
 
-                if (ricecooker->get_bottom_temperature() < cooking_temp) {
+                ESP_LOGD(TAG, "Rice: Heating, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
+                    top_temp, bottom_temp, target);
+
+                if (ricecooker->get_bottom_temperature() < target) {
                     ricecooker->power_on();
                 } else {
                     set_stage(Cook);
@@ -432,10 +438,12 @@ namespace ricecooker {
 
             case Cook:
 
-                ESP_LOGD(TAG, "Rice: Cooking, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
-                    top_temp, bottom_temp, cooking_temp);
+                target = cooking_temp;
 
-                ricecooker->power_module(cooking_temp, 1);
+                ESP_LOGD(TAG, "Rice: Cooking, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
+                    top_temp, bottom_temp, target);
+
+                ricecooker->power_module(target, 1);
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
                     set_stage(Vapor);
@@ -446,7 +454,7 @@ namespace ricecooker {
             case Vapor:
 
                 // Temperature curve from `cooking_temp` to 120ºC in `cooking_time / 2` minutes
-                auto target = cooking_temp + (120-cooking_temp) * (now - this->stage_started) / 1000 / 60 / this->cooking_time / 2 ; 
+                target = cooking_temp + (120-cooking_temp) * (now - this->stage_started) / 1000 / 60 / this->cooking_time / 2 ; 
 
                 ESP_LOGD(TAG, "Rice: Vapor, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
                     top_temp, bottom_temp, target);
