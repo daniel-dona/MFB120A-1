@@ -44,8 +44,8 @@ class KeepWarm : public Program {
         KeepWarm(uint8_t target_temp, uint8_t hysteresis);
 
     private:
-        uint8_t max_temp;
-        uint8_t min_temp;
+        uint8_t target_temp;
+        uint8_t hysteresis;
 
         enum Stage { Wait, Warm } stage = Wait;
 };
@@ -86,6 +86,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         void power_on();
         void power_off();
+        void power_module(uint8_t target_temp, uint8_t hysteresis);
 
         void set_program(Program* program);
 

@@ -74,6 +74,16 @@ namespace ricecooker {
         }
     }
 
+    void RiceCooker::power_module(uint8_t target_temp, uint8_t hysteresis) {
+        if (bottom_temperature < target_temp - hysteresis) {
+            power_on();
+        } else if (bottom_temperature >= target_temp + hysteresis) {
+            power_off();
+        } else {
+            // Keep last heating state to reduce relay wear.
+        }
+    }
+
     uint8_t RiceCooker::get_top_temperature(){
         return recv_buffer[3];
     }
@@ -295,22 +305,16 @@ namespace ricecooker {
                 break;
 
             case Warm:
-                ESP_LOGD(TAG, "Temperature: top: %dºC, bottom: %dºC, target_max: %dºC, target_min: %dºC",
-                    top_temp, bottom_temp, this->max_temp, this->min_temp);
+                ESP_LOGD(TAG, "Temperature: top: %dºC, bottom: %dºC, target: %dºC, hysteresis: %dºC",
+                    top_temp, bottom_temp, target_temp, hysteresis);
 
-                if (bottom_temp < this->min_temp) {
-                    ricecooker->power_on();
-                } else if (bottom_temp >= this->max_temp) {
-                    ricecooker->power_off();
-                } else {
-                    // Keep last heating state to reduce relay wear.
-                }
+                ricecooker->power_module(target_temp, hysteresis);
         }
     }
 
     KeepWarm::KeepWarm(uint8_t target_temp, uint8_t hysteresis)
-        : max_temp(target_temp + hysteresis)
-        , min_temp(target_temp - hysteresis)
+        : target_temp(target_temp)
+        , hysteresis(hysteresis)
     {}
 
     char* KeepWarm::get_name() {
@@ -397,16 +401,10 @@ namespace ricecooker {
                     set_stage(Heat);
                 }
 
-                ESP_LOGD(TAG, "Rice: Soaking, Temperature: top: %dºC, bottom: %dºC, target_max: 70ºC, target_min: 60ºC",
+                ESP_LOGD(TAG, "Rice: Soaking, Temperature: top: %dºC, bottom: %dºC, target: 65ºC",
                     top_temp, bottom_temp);
 
-                if (bottom_temp < 60) {
-                    ricecooker->power_on();
-                } else if (bottom_temp > 67) {
-                    ricecooker->power_off();
-                } else {
-                    // Keep last heating state to reduce relay wear.
-                }
+                ricecooker->power_module(65, 5);
 
                 break;
 
@@ -437,13 +435,7 @@ namespace ricecooker {
                 ESP_LOGD(TAG, "Rice: Cooking, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
                     top_temp, bottom_temp, cooking_temp);
 
-                if (bottom_temp < cooking_temp - 2) {
-                    ricecooker->power_on();
-                } else if (bottom_temp >= cooking_temp) {
-                    ricecooker->power_off();
-                } else {
-                    // Keep last heating state to reduce relay wear.
-                }
+                ricecooker->power_module(cooking_temp, 1);
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
                     set_stage(Vapor);
@@ -459,13 +451,7 @@ namespace ricecooker {
                 ESP_LOGD(TAG, "Rice: Vapor, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
                     top_temp, bottom_temp, target);
 
-                if (bottom_temp < target - 3) {
-                    ricecooker->power_on();
-                } else if (bottom_temp >= target + 3) {
-                    ricecooker->power_off();
-                } else {
-                    // Keep last heating state to reduce relay wear.
-                }
+                ricecooker->power_module(target, 2);
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
                     ricecooker->power_off();
