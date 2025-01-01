@@ -11,11 +11,75 @@ namespace ricecooker {
 static const uint8_t RECV_HEADER = 0xaa;
 static const uint8_t SEND_HEADER = 0x55;
 
+static char fast_rice_name[] = "Fast Rice";
+static char rice_name[] = "Rice";
+static char keepwarm_name[] = "Keep Warm";
+static char none_name[] = "None";
+
+class RiceCooker;
+
+class Program {
+    public:
+        virtual void step(RiceCooker* ricecooker) = 0;
+        virtual char* get_name() = 0;
+
+        /*
+            Starts the program.
+
+            If the program was previously cancelled,
+            starting it will start from the beginning, not the last state.
+        */
+        virtual void start() = 0;
+
+        virtual void cancel() = 0;
+};
+
+class KeepWarm : public Program {
+    public:
+        void step(RiceCooker* ricecooker) override;
+        char* get_name() override;
+        void start() override;
+        void cancel() override;
+
+        KeepWarm(uint8_t target_temp, uint8_t hysteresis);
+
+    private:
+        uint8_t max_temp;
+        uint8_t min_temp;
+
+        enum Stage { Wait, Warm } stage = Wait;
+};
+
+class RiceProgram : public Program {
+    public:
+        void step(RiceCooker* ricecooker) override;
+        char* get_name() override;
+        void start() override;
+        void cancel() override;
+
+        RiceProgram(uint8_t cooking_time);
+        RiceProgram(uint8_t cooking_time, uint8_t cooking_temp);
+        RiceProgram(uint8_t cooking_time, bool fast);
+        RiceProgram(uint8_t cooking_time, uint8_t cooking_temp, bool fast);
+
+    private:
+        // Config
+        uint8_t cooking_time;
+        uint8_t cooking_temp = 95;
+        bool fast = false;
+
+        // State
+        enum Stage { Wait, Soak, Heat, Cook, Vapor } stage = Wait;
+        int stage_started;
+
+        void set_stage(Stage stage);
+};
+
 class RiceCooker : public Component, public uart::UARTDevice {
 
     public:
         void start();
-        void stop();
+        void cancel();
         void set_cooking_mode();
         void manual_temperature_set(uint8_t temp);
         void manual_timer_set();  
@@ -23,12 +87,14 @@ class RiceCooker : public Component, public uart::UARTDevice {
         void power_on();
         void power_off();
 
-        void set_temperature(uint8_t temperature);
+        void set_program(Program* program);
 
         uint8_t get_top_temperature();
         uint8_t get_bottom_temperature();
 
         bool get_power();
+
+        char* get_program_name();
 
         void setup() override;
         void loop() override;
@@ -61,19 +127,12 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         bool power = false;
 
-        int mode;
-        bool warm = false;
-        bool cooking = false;
         bool sleep = false;
+
+        Program* program {nullptr};
 
         uint8_t top_temperature;
         uint8_t bottom_temperature;
-
-        uint8_t target_temperature = 0;
-
-        sensor::Sensor *top_temperature_{nullptr};
-        sensor::Sensor *bottom_temperature_{nullptr};
-        sensor::Sensor *runtime_{nullptr};
 };
 
 

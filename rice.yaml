@@ -69,6 +69,21 @@ switch:
       - lambda:
           id(ricecooker_id).power_off();
 
+
+button:
+  - platform: template
+    name: "Start"
+    on_press:
+      - lambda:
+          id(ricecooker_id).start();
+
+  - platform: template
+    name: "Cancel"
+    on_press:
+      - lambda:
+          id(ricecooker_id).cancel();
+
+
 sensor:
   - platform: template
     name: "Top sensor temperature"
@@ -91,16 +106,38 @@ sensor:
     device_class: temperature
     state_class: measurement
 
-number:
+# number:
+#   - platform: template
+#     id: target_temperature
+#     name: "Target temperature"
+#     icon: mdi:thermometer
+#     min_value: 0
+#     max_value: 120
+#     mode: slider
+#     step: 1
+#     optimistic: true
+#     set_action:
+#       - lambda: |-
+#           id(ricecooker_id).set_program(new KeepWarm(x, 5));
+
+select:
   - platform: template
-    id: target_temperature
-    name: "Target temperature"
-    icon: mdi:thermometer
-    min_value: 0
-    max_value: 120
-    mode: slider
-    step: 1
-    optimistic: true
+    name: "Mode Select"
+    options:
+      - None
+      - Keep Warm
+      - Rice
+      - Fast Rice
+    lambda: |-
+      return std::string(id(ricecooker_id).get_program_name());
     set_action:
       - lambda: |-
-          id(ricecooker_id).set_temperature(x);
+          if (x == "Keep Warm") {
+            id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(65, 5));
+          } else if (x == "Rice") {
+            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15));
+          } else if (x == "Fast Rice") {
+            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15, true));
+          } else if (x == "None") {
+            id(ricecooker_id).set_program(nullptr);
+          }
