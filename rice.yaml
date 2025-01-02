@@ -133,9 +133,9 @@ select:
     set_action:
       - lambda: |-
           if (x == "Keep Warm") {
-            id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(65, 5));
+            id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(65, 3));
           } else if (x == "Rice") {
-            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15));
+            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(25));
           } else if (x == "Fast Rice") {
             id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15, true));
           } else if (x == "None") {

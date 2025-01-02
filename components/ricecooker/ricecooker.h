@@ -65,11 +65,11 @@ class RiceProgram : public Program {
     private:
         // Config
         uint8_t cooking_time;
-        uint8_t cooking_temp = 95;
+        uint8_t cooking_temp = 100;
         bool fast = false;
 
         // State
-        enum Stage { Wait, Soak, Heat, Cook, Vapor } stage = Wait;
+        enum Stage { Wait, Start, Soak, Heat, Cook, Vapor } stage = Wait;
         int stage_started;
 
         void set_stage(Stage stage);
@@ -134,6 +134,9 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         uint8_t top_temperature;
         uint8_t bottom_temperature;
+
+        uint8_t max_temperature = 0;
+        uint8_t last_max_target = 0;
 };
 
 

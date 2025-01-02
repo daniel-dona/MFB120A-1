@@ -74,11 +74,27 @@ namespace ricecooker {
         }
     }
 
+    /*
+    */
     void RiceCooker::power_module(uint8_t target_temp, uint8_t hysteresis) {
-        if (bottom_temperature < target_temp - hysteresis) {
+
+        int lag;
+        if (max_temperature > last_max_target) {
+            lag = max_temperature - last_max_target;
+        } else {
+            lag = 0;
+        }
+        ESP_LOGD(TAG, "Computed a temperature sensor lag of %dºC", lag);
+
+        auto min_target = target_temp - hysteresis;
+        auto max_target = std::max(min_target, target_temp + hysteresis - lag);
+
+        if (bottom_temperature < min_target) {
             power_on();
-        } else if (bottom_temperature >= target_temp + hysteresis) {
+        } else if (bottom_temperature >= max_target) {
             power_off();
+            last_max_target = max_target;
+            max_temperature = bottom_temperature;
         } else {
             // Keep last heating state to reduce relay wear.
         }
@@ -100,13 +116,13 @@ namespace ricecooker {
 
         if (program == nullptr) {
             ESP_LOGD(TAG, "Setting Program: null");
-            delete this->program;
-            this->program = nullptr;
             this->power_off();
-            return;
+        } else {
+            ESP_LOGD(TAG, "Setting Program: %s", program->get_name());
         }
 
-        ESP_LOGD(TAG, "Setting Program: %s", program->get_name());
+        last_max_target = 0;
+        max_temperature = 0;
 
         delete this->program;
         this->program = program;
@@ -236,6 +252,7 @@ namespace ricecooker {
 
         this->top_temperature = recv_buffer[3];
         this->bottom_temperature = recv_buffer[4];
+        this->max_temperature = std::max(this->max_temperature, recv_buffer[4]);
     }
 
 
@@ -364,7 +381,7 @@ namespace ricecooker {
 
 
     void RiceProgram::start() {
-        set_stage(Soak);
+        set_stage(Start);
     }
 
     void RiceProgram::cancel() {
@@ -397,6 +414,21 @@ namespace ricecooker {
 
                 break;
 
+            case Start:
+
+                target = 60;
+
+                ESP_LOGD(TAG, "Rice: Soaking, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
+                    top_temp, bottom_temp, target);
+
+                if (ricecooker->get_bottom_temperature() < target) {
+                    ricecooker->power_module(target, 0);
+                } else {
+                    set_stage(Soak);
+                }
+
+                break;
+
             case Soak:
 
                 target = 65;
@@ -420,7 +452,7 @@ namespace ricecooker {
                     top_temp, bottom_temp, target);
 
                 if (ricecooker->get_bottom_temperature() < target) {
-                    ricecooker->power_on();
+                    ricecooker->power_module(target, 0);
                 } else {
                     set_stage(Cook);
                 }
@@ -446,6 +478,7 @@ namespace ricecooker {
                 ricecooker->power_module(target, 1);
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
+                    ricecooker->power_on();
                     set_stage(Vapor);
                 }
 
@@ -459,11 +492,12 @@ namespace ricecooker {
                 ESP_LOGD(TAG, "Rice: Vapor, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
                     top_temp, bottom_temp, target);
 
-                ricecooker->power_module(target, 2);
+                ricecooker->power_module(target, 0);
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
                     ricecooker->power_off();
                     ricecooker->set_program(new KeepWarm(65, 2));
+                    ricecooker->start();
                 }
 
                 break;
