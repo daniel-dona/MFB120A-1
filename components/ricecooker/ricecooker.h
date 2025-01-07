@@ -73,6 +73,8 @@ class RiceProgram : public Program {
         int stage_started;
 
         void set_stage(Stage stage);
+
+        uint8_t vapor_max = 0;
 };
 
 class RiceCooker : public Component, public uart::UARTDevice {
@@ -86,7 +88,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         void power_on();
         void power_off();
-        void power_module(uint8_t target_temp, uint8_t hysteresis);
+        void power_modulate(uint8_t target_temp, uint8_t hysteresis);
 
         void set_program(Program* program);
 
@@ -118,8 +120,12 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         // Tickers
         int mcu_interval = 100;
-        int relay_interval = 2000;
+        int relay_interval = 500;
         int mcu_last = 0, relay_last = 0;
+
+        int power_remain = 0;
+        int power_wait_remain = 0;
+        int power_modulate_last = 0;
 
         // State
         int hours = 0;
@@ -137,6 +143,9 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         uint8_t max_temperature = 0;
         uint8_t last_max_target = 0;
+
+        /* Estimate of milliseconds of the heater on needed to rise 1ºC bottom_temperature */
+        int power_speed = 1500;
 };
 
 
