@@ -199,6 +199,22 @@ namespace ricecooker {
 
                 if (now > stage_started + this->cooking_time / 2 * 60 * 1000) {
                     ricecooker->power_off();
+                    set_stage(Rest);
+                }
+
+                break;
+
+            case Rest:
+
+                target = 65;
+
+                ESP_LOGD(TAG, "Rice: Rest, Temperature: top: %dºC, bottom: %dºC, target: %dºC",
+                    top_temp, bottom_temp, target);
+
+                ricecooker->power_modulate(target, 4);
+
+                if (this->fast || now > stage_started + 10 * 60 * 1000) {
+                    ricecooker->power_off();
                     ricecooker->set_program(new KeepWarm(65, 2));
                     ricecooker->start();
                 }

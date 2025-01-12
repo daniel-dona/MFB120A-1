@@ -63,7 +63,7 @@ class RiceProgram : public Program {
         bool fast = false;
 
         // State
-        enum Stage { Wait, Start, Soak, Heat, Cook, Vapor } stage = Wait;
+        enum Stage { Wait, Start, Soak, Heat, Cook, Vapor, Rest } stage = Wait;
         int stage_started;
 
         void set_stage(Stage stage);
