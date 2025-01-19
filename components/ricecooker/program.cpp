@@ -86,6 +86,43 @@ namespace ricecooker {
         set_stage(Wait);
     }
 
+    static const unsigned int RICE_PROGRAM_SOAK_MINUTES = 45;
+    static const unsigned int RICE_PROGRAM_REST_MINUTES = 10;
+
+    std::optional<unsigned int> RiceProgram::remaining_time() {
+        
+        unsigned int res = 0;
+        
+        switch (stage) {
+            Wait:
+                return std::nullopt;
+            Start:
+                // Just a guess
+                // TODO: calculate time needed to step up the temperature
+                res += 2;
+            Soak:
+                if (!fast)
+                    res += RICE_PROGRAM_SOAK_MINUTES;
+            Heat:
+                if (!fast)
+                    res += 2;
+                else
+                    // Guess more time as fast program starts from lower temperature
+                    res += 4;
+            Cook:
+                res += cooking_time / 2;
+            Vapor:
+                res += cooking_time / 2;
+            Rest:
+                if (!fast)
+                    res += RICE_PROGRAM_REST_MINUTES;
+        }
+
+        res -= (millis() - stage_started) / 1000 / 60;
+
+        return res;
+    }
+
     void RiceProgram::set_stage(Stage stage) {
         this->stage = stage;
         this->stage_started = millis();
@@ -131,7 +168,7 @@ namespace ricecooker {
 
                 target = 65;
 
-                if (now > stage_started + 45 * 60 * 1000 || this->fast) {
+                if (this->fast || now > stage_started + RICE_PROGRAM_SOAK_MINUTES * 60 * 1000) {
                     set_stage(Heat);
                 }
 
@@ -213,7 +250,7 @@ namespace ricecooker {
 
                 ricecooker->power_modulate(target, 4);
 
-                if (this->fast || now > stage_started + 10 * 60 * 1000) {
+                if (this->fast || now > stage_started + RICE_PROGRAM_REST_MINUTES * 60 * 1000) {
                     ricecooker->power_off();
                     ricecooker->set_program(new KeepWarm(65, 2));
                     ricecooker->start();

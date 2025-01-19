@@ -1,5 +1,7 @@
 #pragma once
 
+#include <optional>
+
 #include "ricecooker.h"
 
 namespace esphome {
@@ -26,6 +28,16 @@ class Program {
         virtual void start() = 0;
 
         virtual void cancel() = 0;
+
+        /*
+            Returns the remaining time to finish the program in minutes.
+
+            If the program will never finish, it returns nullopt.
+
+            If the remaining time is not well defined,
+            a best try estimate is returned.
+        */
+        virtual std::optional<unsigned int> remaining_time() { return std::nullopt; }
 };
 
 class KeepWarm : public Program {
@@ -50,6 +62,7 @@ class RiceProgram : public Program {
         char* get_name() override;
         void start() override;
         void cancel() override;
+        std::optional<unsigned int> remaining_time() override;
 
         RiceProgram(uint8_t cooking_time);
         RiceProgram(uint8_t cooking_time, uint8_t cooking_temp);

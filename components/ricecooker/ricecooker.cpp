@@ -310,8 +310,13 @@ namespace ricecooker {
             this->mcu_send();
             this->mcu_recv();
 
-            this->hours = get_top_temperature();
-            this->minutes = get_bottom_temperature();
+            if (auto remaining = this->program->remaining_time()) {
+                this->hours = *remaining / 60;
+                this->minutes = *remaining % 60;
+            } else {
+                this->hours = get_top_temperature();
+                this->minutes = get_bottom_temperature();
+            }
         }
 
         if (millis() > relay_last + relay_interval){
@@ -323,7 +328,6 @@ namespace ricecooker {
             } else {
                 ESP_LOGD(TAG, "No program selected");
             }
-            
         }
 
     }
