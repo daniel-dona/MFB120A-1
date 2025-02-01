@@ -75,13 +75,15 @@ namespace ricecooker {
     */
     void RiceCooker::power_modulate(uint8_t target_temp, uint8_t hysteresis) {
 
+        int now = millis();
+        int lapsed = now - power_modulate_last;
+        power_modulate_last = now;
+
         if (power_remain != 0) {
-            power_remain = std::max(1, power_remain - (int) (millis() - power_modulate_last) );
+            power_remain = std::max(1, power_remain - lapsed);
         }
         
-        power_wait_remain = std::max(0, power_wait_remain - (int) (millis() - power_modulate_last) );
-        
-        power_modulate_last = millis();
+        power_wait_remain = std::max(0, power_wait_remain - lapsed);
 
         auto min_target = target_temp - hysteresis;
         auto max_target = target_temp + hysteresis;
@@ -92,16 +94,41 @@ namespace ricecooker {
 
             int diff = (int) last_max_target - (int) max_temperature;
             diff = std::clamp(diff, -3, 3);
-            ESP_LOGD(TAG, "----- Found a diff of %dºC", diff);
-            power_speed = std::clamp(power_speed + 200 * diff, 100, 8000);
 
-            power_remain = (max_target - bottom_temperature) * power_speed;
+            int range = (int) max_temperature - (int) last_min_temp;
+            
+            int time_needed;
+            if (range > 0) {
+                time_needed = last_power_time / range;
+            } else {
+                // Avoid division by zero.
+                // Temperature did not rise with last_power_time, so increment it
+                time_needed = last_power_time * 5 / 4;
+            }
+
+            int error = time_needed - thermal_mass;
+        
+            ESP_LOGD(TAG, "In last heating: error %d ms/ºC, diff %dºC", error, diff);
+
+            // Change estimted thermal mass in proportion to how different (`diff`)
+            // was the actual max temperature and its target.
+            if (diff == 0) {
+                thermal_mass += std::clamp(error, -200, 200);
+            } else if (diff > 0) {
+                thermal_mass += std::clamp(error, 200, 500 * diff);
+            } else {
+                thermal_mass += std::clamp(error, -500 * diff, -200);
+            }
+
+            power_remain = (max_target - bottom_temperature) * thermal_mass;
             relay_interval = std::clamp(power_remain, 100, 5000);
 
             last_max_target = max_target;
             max_temperature = bottom_temperature;
+            last_min_temp = bottom_temperature;
+            last_power_time = power_remain;
 
-            ESP_LOGD(TAG, "Power modulating: heating ON for %d ms, Power speed %d", power_remain, power_speed);
+            ESP_LOGD(TAG, "Power modulating: heating ON for %d ms, Thermal mass %d ms/ºC", power_remain, thermal_mass);
 
         } else if (bottom_temperature >= max_target || power_remain == 1) {
 
@@ -114,7 +141,7 @@ namespace ricecooker {
         } else {
             // Keep last heating state to reduce relay wear.
 
-            ESP_LOGD(TAG, "Power modulating: power remaining %d ms, power waiting %d ms, Power speed %d", power_remain, power_wait_remain, power_speed);
+            ESP_LOGD(TAG, "Power modulating: power remaining %d ms, power waiting %d ms, Thermal mass %d ms/ºC", power_remain, power_wait_remain, thermal_mass);
         }
     }
 

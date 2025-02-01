@@ -83,9 +83,11 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         uint8_t max_temperature = 0;
         uint8_t last_max_target = 0;
+        uint8_t last_min_temp = 0;
+        int last_power_time = 0;
 
         /* Estimate of milliseconds of the heater on needed to rise 1ºC bottom_temperature */
-        int power_speed = 1500;
+        int thermal_mass = 1500;
 };
 
 
