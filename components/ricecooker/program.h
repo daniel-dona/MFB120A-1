@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "ricecooker.h"
+#include "heater.h"
 
 namespace esphome {
 namespace ricecooker {
@@ -16,7 +17,7 @@ static char none_name[] = "None";
 
 class Program {
     public:
-        virtual void step(RiceCooker* ricecooker) = 0;
+        virtual void step(Heater* heater) = 0;
         virtual char* get_name() = 0;
 
         /*
@@ -42,7 +43,7 @@ class Program {
 
 class KeepWarm : public Program {
     public:
-        void step(RiceCooker* ricecooker) override;
+        void step(Heater* heater) override;
         char* get_name() override;
         void start() override;
         void cancel() override;
@@ -58,7 +59,7 @@ class KeepWarm : public Program {
 
 class RiceProgram : public Program {
     public:
-        void step(RiceCooker* ricecooker) override;
+        void step(Heater* heater) override;
         char* get_name() override;
         void start() override;
         void cancel() override;
@@ -78,6 +79,7 @@ class RiceProgram : public Program {
         // State
         enum Stage { Wait, Start, Soak, Heat, Cook, Vapor, Rest } stage = Wait;
         int stage_started;
+        bool finished = false;
 
         void set_stage(Stage stage);
 

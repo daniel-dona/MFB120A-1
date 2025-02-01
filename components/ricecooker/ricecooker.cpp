@@ -58,116 +58,34 @@ namespace ricecooker {
     // Control
 
     void RiceCooker::power_on(){
-        if(!this->power){
-            ESP_LOGD(TAG, "Heater power: on");
-            this->power = true;
-        }
+        heater.power_on();
     }
 
     void RiceCooker::power_off(){
-        if(this->power){
-            ESP_LOGD(TAG, "Heater power: off");
-            this->power = false;
-        }
-    }
-
-    /*
-    */
-    void RiceCooker::power_modulate(uint8_t target_temp, uint8_t hysteresis) {
-
-        int now = millis();
-        int lapsed = now - power_modulate_last;
-        power_modulate_last = now;
-
-        if (power_remain != 0) {
-            power_remain = std::max(1, power_remain - lapsed);
-        }
-        
-        power_wait_remain = std::max(0, power_wait_remain - lapsed);
-
-        auto min_target = target_temp - hysteresis;
-        auto max_target = target_temp + hysteresis;
-
-        if (bottom_temperature < min_target && power_remain == 0 && power_wait_remain == 0) {
-
-            power_on();
-
-            int diff = (int) last_max_target - (int) max_temperature;
-            diff = std::clamp(diff, -3, 3);
-
-            int range = (int) max_temperature - (int) last_min_temp;
-            
-            int time_needed;
-            if (range > 0) {
-                time_needed = last_power_time / range;
-            } else {
-                // Avoid division by zero.
-                // Temperature did not rise with last_power_time, so increment it
-                time_needed = last_power_time * 5 / 4;
-            }
-
-            int error = time_needed - thermal_mass;
-        
-            ESP_LOGD(TAG, "In last heating: error %d ms/ºC, diff %dºC", error, diff);
-
-            // Change estimted thermal mass in proportion to how different (`diff`)
-            // was the actual max temperature and its target.
-            if (diff == 0) {
-                thermal_mass += std::clamp(error, -200, 200);
-            } else if (diff > 0) {
-                thermal_mass += std::clamp(error, 200, 500 * diff);
-            } else {
-                thermal_mass += std::clamp(error, -500 * diff, -200);
-            }
-
-            power_remain = (max_target - bottom_temperature) * thermal_mass;
-            relay_interval = std::clamp(power_remain, 100, 5000);
-
-            last_max_target = max_target;
-            max_temperature = bottom_temperature;
-            last_min_temp = bottom_temperature;
-            last_power_time = power_remain;
-
-            ESP_LOGD(TAG, "Power modulating: heating ON for %d ms, Thermal mass %d ms/ºC", power_remain, thermal_mass);
-
-        } else if (bottom_temperature >= max_target || power_remain == 1) {
-
-            power_off();
-
-            power_remain = 0;
-            relay_interval = 2000;
-            power_wait_remain = 30000;
-
-        } else {
-            // Keep last heating state to reduce relay wear.
-
-            ESP_LOGD(TAG, "Power modulating: power remaining %d ms, power waiting %d ms, Thermal mass %d ms/ºC", power_remain, power_wait_remain, thermal_mass);
-        }
+        heater.power_off();
     }
 
     uint8_t RiceCooker::get_top_temperature(){
-        return recv_buffer[3];
+        return heater.get_top_temperature();
     }
 
     uint8_t RiceCooker::get_bottom_temperature(){
-        return recv_buffer[4];
+        return heater.get_bottom_temperature();
     }
 
     bool RiceCooker::get_power(){
-        return this->power;
+        return heater.get_power();
     }
 
     void RiceCooker::set_program(Program* program){
 
         if (program == nullptr) {
             ESP_LOGD(TAG, "Setting Program: null");
-            this->power_off();
         } else {
             ESP_LOGD(TAG, "Setting Program: %s", program->get_name());
         }
 
-        last_max_target = 0;
-        max_temperature = 0;
+        heater.reset();
 
         delete this->program;
         this->program = program;
@@ -188,7 +106,7 @@ namespace ricecooker {
     }
 
     void RiceCooker::cancel() {
-        this->power_off();
+        this->heater.reset();
 
         if (this->program != nullptr)
             program->cancel();
@@ -206,7 +124,7 @@ namespace ricecooker {
         //buffer[2] |= 0b00000100; // RL
 
 
-        if(power){
+        if(heater.get_power()){
             buffer[2] |= 0b00000100;
         }
 
@@ -221,8 +139,7 @@ namespace ricecooker {
 
         buffer[7] = 0b00000000;
 
-        if (this->power){
-
+        if (heater.get_power()){
             buffer[7] |= 0b00000001; // LED1
         }
         //buffer[7] |= 0b00000010; // LED2
@@ -295,9 +212,7 @@ namespace ricecooker {
             return;
         }
 
-        this->top_temperature = recv_buffer[3];
-        this->bottom_temperature = recv_buffer[4];
-        this->max_temperature = std::max(this->max_temperature, recv_buffer[4]);
+        this->heater.update(recv_buffer[3], recv_buffer[4]);
     }
 
 
@@ -341,8 +256,8 @@ namespace ricecooker {
                 this->hours = *remaining / 60;
                 this->minutes = *remaining % 60;
             } else {
-                this->hours = get_top_temperature();
-                this->minutes = get_bottom_temperature();
+                this->hours = heater.get_top_temperature();
+                this->minutes = heater.get_bottom_temperature();
             }
         }
 
@@ -351,7 +266,14 @@ namespace ricecooker {
             relay_last = millis();
 
             if (this->program != nullptr) {
-                this->program->step(this);
+                this->program->step(&heater);
+                heater.step(millis());
+
+                if (this->program->remaining_time() <= 0) {
+                    heater.power_off();
+                    set_program(new KeepWarm(65, 2));
+                    start();
+                }
             } else {
                 ESP_LOGD(TAG, "No program selected");
             }
