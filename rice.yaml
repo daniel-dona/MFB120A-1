@@ -31,7 +31,7 @@ api:
 
 ota:
   - platform: esphome
-    password: !secret ota_pin
+    password: !secret ota_pin3
 
 wifi: 
   ssid: !secret wifi_ssid
@@ -106,19 +106,19 @@ sensor:
     device_class: temperature
     state_class: measurement
 
-# number:
-#   - platform: template
-#     id: target_temperature
-#     name: "Target temperature"
-#     icon: mdi:thermometer
-#     min_value: 0
-#     max_value: 120
-#     mode: slider
-#     step: 1
-#     optimistic: true
-#     set_action:
-#       - lambda: |-
-#           id(ricecooker_id).set_program(new KeepWarm(x, 5));
+number:
+  - platform: template
+    id: target_temperature
+    name: "Target temperature"
+    icon: mdi:thermometer
+    min_value: 0
+    max_value: 120
+    mode: slider
+    step: 1
+    optimistic: true
+    set_action:
+      - lambda: |-
+          id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(x, 5));
 
 select:
   - platform: template

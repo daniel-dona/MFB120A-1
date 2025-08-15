@@ -87,7 +87,10 @@ namespace ricecooker {
 
         heater.reset();
 
-        delete this->program;
+        // Extra safety: check if program is already nullptr before deleting
+        if (this->program != nullptr) {
+            delete this->program;
+        }
         this->program = program;
     }
 
@@ -198,11 +201,22 @@ namespace ricecooker {
             if (ch == RECV_HEADER || n == 10){
                 n = 0;
             }
-            
-            recv_buffer[n] = ch;
 
-            n++;
-            
+            // Extra safety: prevent buffer overflow
+            if (n < 10) {
+                recv_buffer[n] = ch;
+                n++;
+            } else {
+                ESP_LOGD(TAG, "MCU recv buffer full, skipping data");
+                continue;
+            }
+
+        }
+
+        // Extra safety: ensure we have enough data for CRC check
+        if (n < 10) {
+            ESP_LOGD(TAG, "Incomplete MCU data packet received");
+            return;
         }
 
         uint16_t crc = crc16(recv_buffer+sizeof(uint8_t), 7);
@@ -212,18 +226,23 @@ namespace ricecooker {
             return;
         }
 
-        this->heater.update(recv_buffer[3], recv_buffer[4]);
+        // Extra safety: check temperature values are in valid range
+        if (recv_buffer[3] <= 100 && recv_buffer[4] <= 100) {
+            this->heater.update(recv_buffer[3], recv_buffer[4]);
+        } else {
+            ESP_LOGD(TAG, "Invalid temperature values from MCU");
+        }
     }
 
 
     void RiceCooker::setup() {
 
         uint8_t reset[][11] = {
-        {0x55,0x07,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xc7,0x18}, //Black
-        {0x55,0x07,0x10,0x00,0x00,0x00,0x00,0x1f,0x1f,0x00,0xf0}, //Beep
-        {0x55,0x07,0x10,0xff,0xff,0xff,0xff,0x1f,0x1f,0x8a,0x20}, //Beep
-        {0x55,0x07,0x00,0xff,0xff,0xff,0xff,0x1f,0x1f,0xbd,0x5b}, //All
-        {0x55,0x07,0x00,0xff,0xff,0xff,0xff,0x02,0x18,0xb8,0x93}  //?
+            {0x55,0x07,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0xc7,0x18}, //Black
+            {0x55,0x07,0x10,0x00,0x00,0x00,0x00,0x1f,0x1f,0x00,0xf0}, //Beep
+            {0x55,0x07,0x10,0xff,0xff,0xff,0xff,0x1f,0x1f,0x8a,0x20}, //Beep
+            {0x55,0x07,0x00,0xff,0xff,0xff,0xff,0x1f,0x1f,0xbd,0x5b}, //All
+            {0x55,0x07,0x00,0xff,0xff,0xff,0xff,0x02,0x18,0xb8,0x93}  //?
         };
 
         //register_service(&RiceCooker::send_command, "send_command", {"command"});
@@ -252,9 +271,15 @@ namespace ricecooker {
             this->mcu_send();
             this->mcu_recv();
 
-            if (auto remaining = this->program->remaining_time()) {
-                this->hours = *remaining / 60;
-                this->minutes = *remaining % 60;
+            if (this->program != nullptr) {
+                std::optional<unsigned int> remaining = this->program->remaining_time();
+                if (remaining.has_value()) {
+                    this->hours = *remaining / 60;
+                    this->minutes = *remaining % 60;
+                } else {
+                    this->hours = heater.get_top_temperature();
+                    this->minutes = heater.get_bottom_temperature();
+                }
             } else {
                 this->hours = heater.get_top_temperature();
                 this->minutes = heater.get_bottom_temperature();
@@ -269,7 +294,9 @@ namespace ricecooker {
                 this->program->step(&heater);
                 heater.step(millis());
 
-                if (this->program->remaining_time() <= 0) {
+                // Extra safety: check remaining_time() returns valid value
+                std::optional<unsigned int> remaining = this->program->remaining_time();
+                if (remaining.has_value() && *remaining <= 0) {
                     heater.power_off();
                     set_program(new KeepWarm(65, 2));
                     start();

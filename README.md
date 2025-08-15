@@ -90,3 +90,14 @@ Bottom sensor temperature (looks like is simply the int of ºC)
 
 ### Bytes 8 and 9
 CRC16 / XMODEM of the bytes 1 to 7.
+
+
+# Build
+
+At the repo root folder:
+
+```
+docker run --rm -v "${PWD}":/config -it ghcr.io/esphome/esphome compile rice.yaml
+```
+
+# Flash

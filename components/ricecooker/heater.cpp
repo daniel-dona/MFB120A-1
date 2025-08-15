@@ -82,7 +82,12 @@ namespace ricecooker {
             
             int time_needed;
             if (range > 0) {
-                time_needed = last_power_time / range;
+                // Extra safety: check for division by very small numbers
+                if (range < 10) {
+                    time_needed = last_power_time / 10; // Use a minimum range
+                } else {
+                    time_needed = last_power_time / range;
+                }
             } else {
                 // Avoid division by zero.
                 // Temperature did not rise with last_power_time, so increment it
