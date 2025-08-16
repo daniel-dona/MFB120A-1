@@ -75,31 +75,30 @@ namespace ricecooker {
 
             power_on();
 
-            int diff = (int) last_max_target - (int) max_temperature;
-            diff = std::clamp(diff, -3, 3);
-
             int range = (int) max_temperature - (int) last_min_temp;
             
             int time_needed;
-            if (range > 0) {
-                // Extra safety: check for division by very small numbers
-                if (range < 10) {
-                    time_needed = last_power_time / 10; // Use a minimum range
-                } else {
-                    time_needed = last_power_time / range;
-                }
+            if (range >= 1) {
+                time_needed = last_power_time / range;
             } else {
                 // Avoid division by zero.
                 // Temperature did not rise with last_power_time, so increment it
-                time_needed = last_power_time * 5 / 4;
+                time_needed = last_power_time + last_power_time / 4;
             }
 
+            int diff = (int) last_max_target - (int) max_temperature;
+            diff = std::clamp(diff, -3, 3);
+
             int error = time_needed - thermal_mass;
-        
             ESP_LOGD(TAG, "In last heating: error %d ms/ºC, diff %dºC", error, diff);
 
-            if (!just_reset) {
-                // Change estimted thermal mass in proportion to how different (`diff`)
+            if (
+                !just_reset
+                // We cannot estimate thermal mass if heat is used to boil water
+                // instead of raising its temperature.
+                && max_temperature < 100
+            ) {
+                // Change estimated thermal mass in proportion to how different (`diff`)
                 // was the actual max temperature and its target.
                 if (diff == 0) {
                     thermal_mass += std::clamp(error, -200, 200);
