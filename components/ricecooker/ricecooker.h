@@ -20,6 +20,10 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
     public:
         RiceCooker();
+
+        void set_sensor_temp_top(sensor::Sensor *sensor_top) { sensor_top_ = sensor_top; }
+        void set_sensor_temp_bottom(sensor::Sensor *sensor_bottom) { sensor_bottom_ = sensor_bottom; }
+
         void start();
         void cancel();
         void set_cooking_mode();
@@ -43,6 +47,10 @@ class RiceCooker : public Component, public uart::UARTDevice {
         void update();
         //void dump_config() override;
 
+    protected:
+        sensor::Sensor *sensor_top_;
+        sensor::Sensor *sensor_bottom_;
+
     private:
         void timer();
 
@@ -58,7 +66,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
         bool sleep = false;
 
         Program* program {nullptr};
-        Heater heater;
+        Heater* heater;
         MCUCommunicator* mcu_communicator;
 };
 }

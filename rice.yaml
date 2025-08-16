@@ -5,7 +5,6 @@ external_components:
   source:
     type: local
     path: components
-
   
 esp32:
   board: esp32dev
@@ -50,11 +49,12 @@ uart:
     rx_pin: GPIO32
     baud_rate: 9600
 
+
 ricecooker:
-  id: ricecooker_id
+  id: ricecooker_1
   uart_id: uart_bus
-  max_temp: 120
-  min_temp: 20
+  #max_temp: 120
+  #min_temp: 20
 
 
 switch:
@@ -63,13 +63,13 @@ switch:
     id: power_switch
     icon: mdi:power
     lambda: |-
-      return id(ricecooker_id).get_power();
+      return id(ricecooker_1).get_power();
     turn_on_action:
       - lambda:
-          id(ricecooker_id).power_on();
+          id(ricecooker_1).power_on();
     turn_off_action:
       - lambda:
-          id(ricecooker_id).power_off();
+          id(ricecooker_1).power_off();
 
 
 button:
@@ -77,36 +77,46 @@ button:
     name: "Start"
     on_press:
       - lambda:
-          id(ricecooker_id).start();
+          id(ricecooker_1).start();
 
   - platform: template
     name: "Cancel"
     on_press:
       - lambda:
-          id(ricecooker_id).cancel();
+          id(ricecooker_1).cancel();
 
 
-sensor:
-  - platform: template
-    name: "Top sensor temperature"
-    lambda: |-
-      return id(ricecooker_id).get_top_temperature();
-    update_interval: 1s
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    device_class: temperature
-    state_class: measurement
+# sensor:
+#   - platform: template
+#     name: "Top sensor temperature"
+#     lambda: |-
+#       return id(ricecooker_1).get_top_temperature();
+#     update_interval: 1s
+#     unit_of_measurement: "°C"
+#     accuracy_decimals: 1
+#     device_class: temperature
+#     state_class: measurement
 
 
-  - platform: template
-    name: "Bottom sensor temperature"
-    lambda: |-
-      return id(ricecooker_id).get_bottom_temperature();
-    update_interval: 1s
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    device_class: temperature
-    state_class: measurement
+#   - platform: template
+#     name: "Bottom sensor temperature"
+#     lambda: |-
+#       return id(ricecooker_1).get_bottom_temperature();
+#     update_interval: 1s
+#     unit_of_measurement: "°C"
+#     accuracy_decimals: 1
+#     device_class: temperature
+#     state_class: measurement
+
+#sensor:
+#  - platform: ricecooker
+#    ricecooker_id: ricecooker_1
+    #top_temperature_sensor:
+    #  name: Sensor top
+      
+    #bottom_temperature_sensor:
+    #  name: Sensor bottom
+
 
 number:
   - platform: template
@@ -120,7 +130,7 @@ number:
     optimistic: true
     set_action:
       - lambda: |-
-          id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(x, 5));
+          id(ricecooker_1).set_program(new esphome::ricecooker::KeepWarm(x, 5));
 
 select:
   - platform: template
@@ -131,15 +141,15 @@ select:
       - Rice
       - Fast Rice
     lambda: |-
-      return std::string(id(ricecooker_id).get_program_name());
+      return std::string(id(ricecooker_1).get_program_name());
     set_action:
       - lambda: |-
           if (x == "Keep Warm") {
-            id(ricecooker_id).set_program(new esphome::ricecooker::KeepWarm(70, 5));
+            id(ricecooker_1).set_program(new esphome::ricecooker::KeepWarm(70, 5));
           } else if (x == "Rice") {
-            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15));
+            id(ricecooker_1).set_program(new esphome::ricecooker::RiceProgram(15));
           } else if (x == "Fast Rice") {
-            id(ricecooker_id).set_program(new esphome::ricecooker::RiceProgram(15, true));
+            id(ricecooker_1).set_program(new esphome::ricecooker::RiceProgram(15, true));
           } else if (x == "None") {
-            id(ricecooker_id).set_program(nullptr);
+            id(ricecooker_1).set_program(nullptr);
           }
