@@ -53,6 +53,8 @@ uart:
 ricecooker:
   id: ricecooker_id
   uart_id: uart_bus
+  max_temp: 120
+  min_temp: 20
 
 
 switch:

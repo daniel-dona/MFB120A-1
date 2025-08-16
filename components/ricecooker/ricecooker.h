@@ -7,25 +7,24 @@
 
 #include "program.h"
 #include "heater.h"
+#include "mcu_communicator.h"
 
 namespace esphome {
 namespace ricecooker {
 
 class Program;
 
-static const uint8_t RECV_HEADER = 0xaa;
-static const uint8_t SEND_HEADER = 0x55;
-
 static const char *const TAG = "ricecooker";
 
 class RiceCooker : public Component, public uart::UARTDevice {
 
     public:
+        RiceCooker();
         void start();
         void cancel();
         void set_cooking_mode();
         void manual_temperature_set(uint8_t temp);
-        void manual_timer_set();  
+        void manual_timer_set();
 
         void power_on();
         void power_off();
@@ -45,23 +44,11 @@ class RiceCooker : public Component, public uart::UARTDevice {
         //void dump_config() override;
 
     private:
-
-        uint16_t crc16(const uint8_t *data, size_t len);
-        uint8_t int_7seg(uint8_t value, bool dot);
-        
-        void write_data(uint8_t *buffer);
         void timer();
-        void mcu_send();
-        void mcu_recv();
-
-        // UART communication with MCU
-        uint8_t send_buffer[11];
-        uint8_t recv_buffer[10];
 
         // Tickers
-        int mcu_interval = 100;
         int relay_interval = 500;
-        int mcu_last = 0, relay_last = 0;
+        int relay_last = 0;
 
         // State
         int hours = 0;
@@ -72,6 +59,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         Program* program {nullptr};
         Heater heater;
+        MCUCommunicator* mcu_communicator;
 };
 }
 }

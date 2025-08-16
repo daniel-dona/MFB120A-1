@@ -8,6 +8,8 @@ DEPENDENCIES = ["uart"]
 AUTO_LOAD = ["sensor"]
 
 CONF_UART = "uart_id"
+CONF_MAX_TEMP = "max_temp"
+CONF_MIN_TEMP = "min_temp"
 
 ricecooker_ns = cg.esphome_ns.namespace("ricecooker")
 RiceCooker = ricecooker_ns.class_("RiceCooker", cg.Component, uart.UARTDevice)
@@ -15,6 +17,8 @@ RiceCooker = ricecooker_ns.class_("RiceCooker", cg.Component, uart.UARTDevice)
 CONFIG_SCHEMA = cv.Schema({
   cv.GenerateID(): cv.declare_id(RiceCooker),
   cv.Required(CONF_UART): cv.string,
+  cv.Required(CONF_MAX_TEMP): cv.int_,
+  cv.Required(CONF_MIN_TEMP): cv.int_,
 }).extend(cv.COMPONENT_SCHEMA).extend(uart.UART_DEVICE_SCHEMA)
 
 

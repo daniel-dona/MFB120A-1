@@ -1,3 +1,4 @@
 .esphome
 secrets.yaml
 *.pyc
+.venv
