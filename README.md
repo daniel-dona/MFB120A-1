@@ -13,7 +13,7 @@ Xiaomi Smart Multifunctional Rice Cooker custom firmware
 
 # MCU / ESP32
 
-An ESP32 is used as the main SoC, controlling indirectly all the inputs and outputs and also providing conectivity. An additional unidentified chip (MCU) works as a GPIO extension, controlling the hardware and comunicating using UART with the ESP32. 
+An ESP32 is used as the main SoC, controlling indirectly all the inputs and outputs and also providing connectivity. An additional unidentified chip (MCU) works as a GPIO extension, controlling the hardware and communicating using UART with the ESP32. 
 
 Data packages from ESP32 to MCU are 11 bytes length, including 1 byte header (0x55) and 2 bytes CRC16/XMODEM:
 
@@ -44,7 +44,7 @@ Seems to be multiple misc functions and some actuators, some bit sets the ESP32 
 - 
 
 ### Byte 3 to 6
-Numbers, only 4 and 5 have a dot (time separation dots), all follow the same schema for representing the 7 segmens
+Numbers, only 4 and 5 have a dot (time separation dots), all follow the same schema for representing the 7 segments
 
 ```c
 	uint8_t table [] = { 
