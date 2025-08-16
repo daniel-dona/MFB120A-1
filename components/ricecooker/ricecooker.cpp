@@ -9,12 +9,12 @@ namespace ricecooker {
     // Control
 
     void RiceCooker::power_on(){
-        heater->power_on();
+        heater.power_on();
         mcu_communicator->set_power(true);
     }
 
     void RiceCooker::power_off(){
-        heater->power_off();
+        heater.power_off();
         mcu_communicator->set_power(false);
     }
 
@@ -27,7 +27,7 @@ namespace ricecooker {
     }
 
     bool RiceCooker::get_power(){
-        return heater->get_power();
+        return heater.get_power();
     }
 
     void RiceCooker::set_program(Program* program){
@@ -38,7 +38,7 @@ namespace ricecooker {
             ESP_LOGD(TAG, "Setting Program: %s", program->get_name());
         }
 
-        heater->reset();
+        heater.reset();
 
         if (this->program != nullptr) {
             delete this->program;
@@ -61,7 +61,7 @@ namespace ricecooker {
     }
 
     void RiceCooker::cancel() {
-        this->heater->reset();
+        this->heater.reset();
 
         if (this->program != nullptr)
             program->cancel();
@@ -79,8 +79,6 @@ namespace ricecooker {
     void RiceCooker::setup() {
         // Initialize MCU communicator
         mcu_communicator = new MCUCommunicator(this);
-        heater = new Heater();
-        
         mcu_communicator->setup();
     }
 
@@ -92,19 +90,22 @@ namespace ricecooker {
         uint8_t top_temp = mcu_communicator->get_top_temperature();
         uint8_t bottom_temp = mcu_communicator->get_bottom_temperature();
 
-        heater->update(top_temp, bottom_temp);
+        //sensor_top_->publish_state(top_temp);
+        //sensor_bottom_->publish_state(bottom_temp);
+
+        heater.update(top_temp, bottom_temp);
 
         if (millis() > relay_last + relay_interval){
             relay_last = millis();
 
             if (this->program != nullptr) {
-                this->program->step(heater);
-                heater->step(millis());
+                this->program->step(&heater);
+                heater.step(millis());
 
                 // Extra safety: check remaining_time() returns valid value
                 std::optional<unsigned int> remaining = this->program->remaining_time();
                 if (remaining.has_value() && *remaining <= 0) {
-                    heater->power_off();
+                    heater.power_off();
                     set_program(new KeepWarm(65, 2));
                     start();
                 }
@@ -130,7 +131,7 @@ namespace ricecooker {
 
         // Update MCU display
         mcu_communicator->set_time(this->hours, this->minutes);
-        mcu_communicator->set_power(heater->get_power());
+        mcu_communicator->set_power(heater.get_power());
         mcu_communicator->set_sleep(this->sleep);
     }
 

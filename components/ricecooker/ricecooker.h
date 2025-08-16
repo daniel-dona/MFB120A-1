@@ -66,7 +66,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
         bool sleep = false;
 
         Program* program {nullptr};
-        Heater* heater;
+        Heater heater;
         MCUCommunicator* mcu_communicator;
 };
 }

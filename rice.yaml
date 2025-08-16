@@ -108,14 +108,14 @@ button:
 #     device_class: temperature
 #     state_class: measurement
 
-#sensor:
-#  - platform: ricecooker
-#    ricecooker_id: ricecooker_1
-    #top_temperature_sensor:
-    #  name: Sensor top
+sensor:
+  - platform: ricecooker
+    ricecooker_id: ricecooker_1
+    top_temperature_sensor:
+      name: Sensor top
       
-    #bottom_temperature_sensor:
-    #  name: Sensor bottom
+    bottom_temperature_sensor:
+      name: Sensor bottom
 
 
 number:

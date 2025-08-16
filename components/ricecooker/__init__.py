@@ -10,7 +10,7 @@ CONF_UART = "uart_id"
 
 
 ricecooker_ns = cg.esphome_ns.namespace("ricecooker")
-RiceCooker = ricecooker_ns.class_("RiceCooker", cg.Component, uart.UARTDevice, cg.PollingComponent)
+RiceCooker = ricecooker_ns.class_("RiceCooker", cg.Component, uart.UARTDevice)
 
 
 CONFIG_SCHEMA = cv.Schema({
