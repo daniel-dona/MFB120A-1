@@ -42,6 +42,8 @@ class RiceCooker : public Component, public uart::UARTDevice {
 
         char* get_program_name();
 
+        void set_wifi(bool status);
+
         void setup() override;
         void loop() override;
         void update();

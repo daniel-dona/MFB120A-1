@@ -41,6 +41,13 @@ wifi:
     ssid: ${name}
     password: !secret wifi_password
 
+  on_connect:
+    - lambda:
+        id(ricecooker_1).set_wifi((bool) true);
+  on_disconnect:
+    - lambda:
+        id(ricecooker_1).set_wifi((bool) false);
+
 captive_portal:
 
 uart:

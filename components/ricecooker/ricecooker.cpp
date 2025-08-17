@@ -1,4 +1,5 @@
 #include "ricecooker.h"
+#include "mcu_communicator.h"
 #include "esphome/core/log.h"
 
 namespace esphome {
@@ -54,6 +55,20 @@ namespace ricecooker {
         }
             
     };
+
+    void RiceCooker::set_wifi(bool status){
+        if(status){
+            this->mcu_communicator->set_led_status(
+                MCUCommunicator::LED_ID::LED9_BLUE, 
+                MCUCommunicator::LED_STATE::ON
+            );
+        }else{
+            this->mcu_communicator->set_led_status(
+                MCUCommunicator::LED_ID::LED9_BLUE, 
+                MCUCommunicator::LED_STATE::OFF
+            );
+        }
+    }
 
     void RiceCooker::start() {
         if (this->program != nullptr)
