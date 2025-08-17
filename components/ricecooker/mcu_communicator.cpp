@@ -176,24 +176,41 @@ void MCUCommunicator::write_data() {
 
     send_buffer[7] = 0b00000000;
 
-    if (power) {
-        send_buffer[7] |= 0b00000001; // LED1
+    // Set LED1-LED5 status in send_buffer[7]
+    if (led1_status) {
+        send_buffer[7] |= 0b00000001; // LED1: bit 0
     }
-
-    //buffer[7] |= 0b00000010; // LED2
-    //buffer[7] |= 0b00000100; // LED3
-    //buffer[7] |= 0b00001000; // LED4
-    //buffer[7] |= 0b00010000; // LED5
-
+    if (led2_status) {
+        send_buffer[7] |= 0b00000010; // LED2: bit 1
+    }
+    if (led3_status) {
+        send_buffer[7] |= 0b00000100; // LED3: bit 2
+    }
+    if (led4_status) {
+        send_buffer[7] |= 0b00001000; // LED4: bit 3
+    }
+    if (led5_status) {
+        send_buffer[7] |= 0b00010000; // LED5: bit 4
+    }
 
     send_buffer[8] = 0b00000000;
 
-    //buffer[8] |= 0b00000001; // LED 6
-    //buffer[8] |= 0b00000010; // LED 7
-    //buffer[8] |= 0b00000100; // LED 8
-
-    //buffer[8] |= 0b00001000; // LED9 orange
-    //buffer[8] |= 0b00010000; // LED9 blue
+    // Set LED6-LED9 status in send_buffer[8]
+    if (led6_status) {
+        send_buffer[8] |= 0b00000001; // LED6: bit 0
+    }
+    if (led7_status) {
+        send_buffer[8] |= 0b00000010; // LED7: bit 1
+    }
+    if (led8_status) {
+        send_buffer[8] |= 0b00000100; // LED8: bit 2
+    }
+    if (led9_orange_status) {
+        send_buffer[8] |= 0b00001000; // LED9_ORANGE: bit 3
+    }
+    if (led9_blue_status) {
+        send_buffer[8] |= 0b00010000; // LED9_BLUE: bit 4
+    }
 
 
     uint16_t crc = crc16(send_buffer + sizeof(uint8_t), 8);
@@ -225,6 +242,45 @@ uint8_t MCUCommunicator::get_top_temperature() {
 
 uint8_t MCUCommunicator::get_bottom_temperature() {
     return bottom_temperature;
+}
+
+void MCUCommunicator::set_led_status(LED_ID led, LED_STATE state) {
+    bool state_bool = (state == LED_STATE::ON);
+    
+    switch (led) {
+        case LED_ID::LED1:
+            led1_status = state_bool;
+            break;
+        case LED_ID::LED2:
+            led2_status = state_bool;
+            break;
+        case LED_ID::LED3:
+            led3_status = state_bool;
+            break;
+        case LED_ID::LED4:
+            led4_status = state_bool;
+            break;
+        case LED_ID::LED5:
+            led5_status = state_bool;
+            break;
+        case LED_ID::LED6:
+            led6_status = state_bool;
+            break;
+        case LED_ID::LED7:
+            led7_status = state_bool;
+            break;
+        case LED_ID::LED8:
+            led8_status = state_bool;
+            break;
+        case LED_ID::LED9_ORANGE:
+            led9_orange_status = state_bool;
+            break;
+        case LED_ID::LED9_BLUE:
+            led9_blue_status = state_bool;
+            break;
+        default:
+            break;
+    }
 }
 
 } // namespace ricecooker
