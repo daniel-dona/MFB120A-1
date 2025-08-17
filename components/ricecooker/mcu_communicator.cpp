@@ -157,6 +157,10 @@ void MCUCommunicator::write_data() {
 
     send_buffer[2] = 0b00000000;
 
+    send_buffer[2] |= 0b00000001; // Some kind of general ON?
+    //buffer[2] |= 0b00010000; // Beep
+    //buffer[2] |= 0b00000100; // RL
+
     if (power) {
         send_buffer[2] |= 0b00000100;
     }
@@ -175,6 +179,22 @@ void MCUCommunicator::write_data() {
     if (power) {
         send_buffer[7] |= 0b00000001; // LED1
     }
+
+    //buffer[7] |= 0b00000010; // LED2
+    //buffer[7] |= 0b00000100; // LED3
+    //buffer[7] |= 0b00001000; // LED4
+    //buffer[7] |= 0b00010000; // LED5
+
+
+    send_buffer[8] = 0b00000000;
+
+    //buffer[8] |= 0b00000001; // LED 6
+    //buffer[8] |= 0b00000010; // LED 7
+    //buffer[8] |= 0b00000100; // LED 8
+
+    //buffer[8] |= 0b00001000; // LED9 orange
+    //buffer[8] |= 0b00010000; // LED9 blue
+
 
     uint16_t crc = crc16(send_buffer + sizeof(uint8_t), 8);
     send_buffer[9] = (crc >> 8) & 0xFF;

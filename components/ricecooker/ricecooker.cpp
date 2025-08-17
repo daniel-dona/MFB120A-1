@@ -90,13 +90,15 @@ namespace ricecooker {
         uint8_t top_temp = mcu_communicator->get_top_temperature();
         uint8_t bottom_temp = mcu_communicator->get_bottom_temperature();
 
-        //sensor_top_->publish_state(top_temp);
-        //sensor_bottom_->publish_state(bottom_temp);
 
         heater.update(top_temp, bottom_temp);
 
         if (millis() > relay_last + relay_interval){
             relay_last = millis();
+
+
+            sensor_top_->publish_state(top_temp);
+            sensor_bottom_->publish_state(bottom_temp);
 
             if (this->program != nullptr) {
                 this->program->step(&heater);
