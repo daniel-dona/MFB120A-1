@@ -2,52 +2,44 @@
 
 #include "esphome/core/datatypes.h"
 
-namespace esphome {
-namespace ricecooker {
-
+namespace esphome::ricecooker {
 
 class Heater {
+ public:
+  void power_on();
+  void power_off();
+  void power_modulate(uint8_t target_temp, uint8_t hysteresis);
 
-    public:
+  uint8_t get_top_temperature() { return top_temperature_; }
+  uint8_t get_bottom_temperature() { return bottom_temperature_; }
 
-        void power_on();
-        void power_off();
-        void power_modulate(uint8_t target_temp, uint8_t hysteresis);
+  void reset();
+  void update(uint8_t top_temp, uint8_t bottom_temp);
+  void step(uint32_t millis);
+  bool get_power() { return power_; }
 
-        uint8_t get_top_temperature();
-        uint8_t get_bottom_temperature();
+ private:
+  uint8_t max_target_{0};
+  uint8_t min_target_{0};
 
-        void reset();
+  int32_t power_remain_{0};
+  int32_t power_wait_remain_{0};
+  uint32_t power_modulate_last_{0};
 
-        void update(uint8_t top_temp, uint8_t bottom_temp);
-        void step(int millis);
-        bool get_power();
+  bool power_{false};
 
-    private:
+  uint8_t top_temperature_{0};
+  uint8_t bottom_temperature_{0};
 
-        uint8_t max_target = 0;
-        uint8_t min_target = 0;
+  uint8_t max_temperature_{0};
+  uint8_t last_max_target_{0};
+  uint8_t last_min_temp_{0};
+  uint32_t last_power_time_{0};
 
-        int power_remain = 0;
-        int power_wait_remain = 0;
-        int power_modulate_last = 0;
+  bool just_reset_{true};
 
-        bool power = false;
-
-        uint8_t top_temperature = 0;
-        uint8_t bottom_temperature = 0;
-
-        uint8_t max_temperature = 0;
-        uint8_t last_max_target = 0;
-        uint8_t last_min_temp = 0;
-        int last_power_time = 0;
-
-        bool just_reset = true;
-
-        /* Estimate of milliseconds of the heater on needed to rise 1ºC bottom_temperature */
-        int thermal_mass = 1500;
+  /// Estimate of milliseconds of the heater on needed to rise 1°C bottom_temperature.
+  int32_t thermal_mass_{1500};
 };
 
-
-}
-}
+}  // namespace esphome::ricecooker

@@ -2,89 +2,87 @@
 
 #include <optional>
 
-#include "ricecooker.h"
-#include "heater.h"
+#include "esphome/core/component.h"
 
-namespace esphome {
-namespace ricecooker {
+namespace esphome::ricecooker {
 
-class RiceCooker;
+class Heater;
 
-static char fast_rice_name[] = "Fast Rice";
-static char rice_name[] = "Rice";
-static char keepwarm_name[] = "Keep Warm";
-static char none_name[] = "None";
+// Program name strings (shared across all instances)
+static const char *const KEEP_WARM_NAME = "Keep Warm";
+static const char *const RICE_NAME = "Rice";
+static const char *const FAST_RICE_NAME = "Fast Rice";
+static const char *const NONE_NAME = "None";
 
 class Program {
-    public:
-        virtual void step(Heater* heater) = 0;
-        virtual char* get_name() = 0;
+ public:
+  virtual ~Program() = default;
 
-        /*
-            Starts the program.
+  virtual void step(Heater *heater) = 0;
+  virtual const char *get_name() const = 0;
 
-            If the program was previously cancelled,
-            starting it will start from the beginning, not the last state.
-        */
-        virtual void start() = 0;
+  /// Starts the program. If previously cancelled, starts from the beginning.
+  virtual void start() = 0;
 
-        virtual void cancel() = 0;
+  /// Cancels the program, resetting its state.
+  virtual void cancel() = 0;
 
-        /*
-            Returns the remaining time to finish the program in minutes.
+  /// Returns remaining time in minutes, or nullopt if infinite/unknown.
+  virtual std::optional<unsigned int> remaining_time() { return std::nullopt; }
 
-            If the program will never finish, it returns nullopt.
-
-            If the remaining time is not well defined,
-            a best try estimate is returned.
-        */
-        virtual std::optional<unsigned int> remaining_time() { return std::nullopt; }
+  /// Resets the program state for reuse.
+  virtual void reset() = 0;
 };
 
 class KeepWarm : public Program {
-    public:
-        void step(Heater* heater) override;
-        char* get_name() override;
-        void start() override;
-        void cancel() override;
+ public:
+  KeepWarm(uint8_t target_temp, uint8_t hysteresis);
 
-        KeepWarm(uint8_t target_temp, uint8_t hysteresis);
+  void step(Heater *heater) override;
+  const char *get_name() const override { return KEEP_WARM_NAME; }
+  void start() override;
+  void cancel() override;
+  void reset() override { stage_ = Wait; }
 
-    private:
-        uint8_t target_temp;
-        uint8_t hysteresis;
+  void set_target_temperature(uint8_t temp) { target_temp_ = temp; }
+  void set_hysteresis(uint8_t hysteresis) { hysteresis_ = hysteresis; }
+  uint8_t get_target_temperature() const { return target_temp_; }
+  uint8_t get_hysteresis() const { return hysteresis_; }
 
-        enum Stage { Wait, Warm } stage = Wait;
+ private:
+  uint8_t target_temp_;
+  uint8_t hysteresis_;
+
+  enum Stage { Wait, Warm } stage_{Wait};
 };
 
 class RiceProgram : public Program {
-    public:
-        void step(Heater* heater) override;
-        char* get_name() override;
-        void start() override;
-        void cancel() override;
-        std::optional<unsigned int> remaining_time() override;
+ public:
+  RiceProgram(uint8_t cooking_time, uint8_t cooking_temp = 100, bool fast = false);
 
-        RiceProgram(uint8_t cooking_time);
-        RiceProgram(uint8_t cooking_time, uint8_t cooking_temp);
-        RiceProgram(uint8_t cooking_time, bool fast);
-        RiceProgram(uint8_t cooking_time, uint8_t cooking_temp, bool fast);
+  void step(Heater *heater) override;
+  const char *get_name() const override;
+  void start() override;
+  void cancel() override;
+  void reset() override;
+  std::optional<unsigned int> remaining_time() override;
 
-    private:
-        // Config
-        uint8_t cooking_time;
-        uint8_t cooking_temp = 100;
-        bool fast = false;
+  void set_cooking_time(uint8_t time) { cooking_time_ = time; }
+  uint8_t get_cooking_time() const { return cooking_time_; }
 
-        // State
-        enum Stage { Wait, Start, Soak, Heat, Cook, Vapor, Rest } stage = Wait;
-        int stage_started;
-        bool finished = false;
+ private:
+  // Configuration
+  uint8_t cooking_time_;
+  uint8_t cooking_temp_;
+  bool fast_;
 
-        void set_stage(Stage stage);
+  // State
+  enum Stage { Wait, Start, Soak, Heat, Cook, Vapor, Rest } stage_{Wait};
+  uint32_t stage_started_{0};
+  bool finished_{false};
+  uint8_t vapor_max_{0};
 
-        uint8_t vapor_max = 0;
+  void set_stage(Stage stage);
 };
 
-}
-}
+}  // namespace esphome::ricecooker

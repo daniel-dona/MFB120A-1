@@ -5,17 +5,15 @@ external_components:
   source:
     type: local
     path: components
-  
+
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
     version: recommended
-    # Custom sdkconfig options
     sdkconfig_options:
       CONFIG_FREERTOS_UNICORE: y
       CONFIG_COMPILER_OPTIMIZATION_SIZE: y
-    # Advanced tweaking options
     advanced:
       ignore_efuse_mac_crc: true
       ignore_efuse_custom_mac: true
@@ -32,7 +30,7 @@ ota:
   - platform: esphome
     password: !secret ota_pin3
 
-wifi: 
+wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
@@ -43,10 +41,10 @@ wifi:
 
   on_connect:
     - lambda:
-        id(ricecooker_1).set_wifi((bool) true);
+        id(ricecooker_1).set_wifi(true);
   on_disconnect:
     - lambda:
-        id(ricecooker_1).set_wifi((bool) false);
+        id(ricecooker_1).set_wifi(false);
 
 captive_portal:
 
@@ -56,28 +54,32 @@ uart:
     rx_pin: GPIO32
     baud_rate: 9600
 
-
 ricecooker:
   id: ricecooker_1
   uart_id: uart_bus
-  #max_temp: 120
-  #min_temp: 20
+  keep_warm_temperature: 65
+  keep_warm_hysteresis: 5
+  rice_cooking_time: 15
 
+sensor:
+  - platform: ricecooker
+    ricecooker_id: ricecooker_1
+    top_temperature:
+      name: "Sensor top"
+    bottom_temperature:
+      name: "Sensor bottom"
 
 switch:
-  - platform: template
-    name: "Power"
-    id: power_switch
-    icon: mdi:power
-    lambda: |-
-      return id(ricecooker_1).get_power();
-    turn_on_action:
-      - lambda:
-          id(ricecooker_1).power_on();
-    turn_off_action:
-      - lambda:
-          id(ricecooker_1).power_off();
+  - platform: ricecooker
+    ricecooker_id: ricecooker_1
+    power:
+      name: "Power"
 
+select:
+  - platform: ricecooker
+    ricecooker_id: ricecooker_1
+    program:
+      name: "Mode Select"
 
 button:
   - platform: template
@@ -91,72 +93,3 @@ button:
     on_press:
       - lambda:
           id(ricecooker_1).cancel();
-
-
-# sensor:
-#   - platform: template
-#     name: "Top sensor temperature"
-#     lambda: |-
-#       return id(ricecooker_1).get_top_temperature();
-#     update_interval: 1s
-#     unit_of_measurement: "°C"
-#     accuracy_decimals: 1
-#     device_class: temperature
-#     state_class: measurement
-
-
-#   - platform: template
-#     name: "Bottom sensor temperature"
-#     lambda: |-
-#       return id(ricecooker_1).get_bottom_temperature();
-#     update_interval: 1s
-#     unit_of_measurement: "°C"
-#     accuracy_decimals: 1
-#     device_class: temperature
-#     state_class: measurement
-
-sensor:
-  - platform: ricecooker
-    ricecooker_id: ricecooker_1
-    top_temperature_sensor:
-      name: Sensor top
-      
-    bottom_temperature_sensor:
-      name: Sensor bottom
-
-
-number:
-  - platform: template
-    id: target_temperature
-    name: "Target temperature"
-    icon: mdi:thermometer
-    min_value: 0
-    max_value: 120
-    mode: slider
-    step: 1
-    optimistic: true
-    set_action:
-      - lambda: |-
-          id(ricecooker_1).set_program(new esphome::ricecooker::KeepWarm(x, 5));
-
-select:
-  - platform: template
-    name: "Mode Select"
-    options:
-      - None
-      - Keep Warm
-      - Rice
-      - Fast Rice
-    lambda: |-
-      return std::string(id(ricecooker_1).get_program_name());
-    set_action:
-      - lambda: |-
-          if (x == "Keep Warm") {
-            id(ricecooker_1).set_program(new esphome::ricecooker::KeepWarm(70, 5));
-          } else if (x == "Rice") {
-            id(ricecooker_1).set_program(new esphome::ricecooker::RiceProgram(15));
-          } else if (x == "Fast Rice") {
-            id(ricecooker_1).set_program(new esphome::ricecooker::RiceProgram(15, true));
-          } else if (x == "None") {
-            id(ricecooker_1).set_program(nullptr);
-          }

@@ -1,86 +1,101 @@
 #pragma once
 
-#include "esphome/core/component.h"
+#include <cstdint>
+#include <cstddef>
+
 #include "esphome/core/datatypes.h"
 #include "esphome/components/uart/uart.h"
 
-namespace esphome {
-namespace ricecooker {
+namespace esphome::ricecooker {
 
-class MCUCommunicator : public Component {
-public:
-    enum class LED_ID {
-        LED1 = 1,
-        LED2,
-        LED3,
-        LED4,
-        LED5,
-        LED6,
-        LED7,
-        LED8,
-        LED9_ORANGE,
-        LED9_BLUE
-    };
+class MCUCommunicator {
+ public:
+  MCUCommunicator() = default;
+  explicit MCUCommunicator(uart::UARTDevice *uart);
 
-    enum class LED_STATE {
-        OFF = 0,
-        ON = 1
-    };
+  void set_uart_device(uart::UARTDevice *uart) { uart_device_ = uart; }
 
-    MCUCommunicator(uart::UARTDevice *parent = nullptr);
+  /// Call regularly from the main loop. Handles init state machine and UART communication.
+  void loop();
 
-    void setup();
-    void loop();
+  bool is_initialized() const { return initialized_; }
 
-    void send_data();
-    void receive_data();
+  // Display control
+  void set_time(uint8_t hours, uint8_t minutes);
+  void set_power(bool power);
+  void set_sleep(bool sleep);
 
-    void set_temperature(uint8_t top_temp, uint8_t bottom_temp);
-    void set_time(uint8_t hours, uint8_t minutes);
-    void set_power(bool power);
-    void set_sleep(bool sleep);
-    void set_led_status(LED_ID led, LED_STATE state);
+  // LED control
+  enum class LED_ID {
+    LED1 = 1,
+    LED2,
+    LED3,
+    LED4,
+    LED5,
+    LED6,
+    LED7,
+    LED8,
+    LED9_ORANGE,
+    LED9_BLUE,
+  };
 
-    uint8_t get_top_temperature();
-    uint8_t get_bottom_temperature();
+  enum class LED_STATE {
+    OFF = 0,
+    ON = 1,
+  };
 
-private:
-    uint16_t crc16(const uint8_t *data, size_t len);
-    uint8_t int_7seg(uint8_t value, bool dot);
-    void write_data();
+  void set_led_status(LED_ID led, LED_STATE state);
 
-    // UART communication buffers
-    uint8_t send_buffer[11];
-    uint8_t recv_buffer[10];
+  // Temperature getters (from received MCU data)
+  uint8_t get_top_temperature() const { return top_temperature_; }
+  uint8_t get_bottom_temperature() const { return bottom_temperature_; }
 
-    // Communication parameters
-    int mcu_interval = 100;
-    int mcu_last = 0;
-    
-    // UART device reference
-    uart::UARTDevice *uart_device_;
+ private:
+  void send_data();
+  void receive_data();
+  void write_data();
+  uint16_t crc16(const uint8_t *data, size_t len);
+  static uint8_t int_7seg(uint8_t value, bool dot);
 
-    // State
-    uint8_t top_temperature = 0;
-    uint8_t bottom_temperature = 0;
-    uint8_t hours = 0;
-    uint8_t minutes = 0;
-    bool power = false;
-    bool sleep = false;
-    bool middle_dots = true;
+  // UART communication
+  uart::UARTDevice *uart_device_{nullptr};
 
-    // LED status tracking
-    bool led1_status = false;
-    bool led2_status = false;
-    bool led3_status = false;
-    bool led4_status = false;
-    bool led5_status = false;
-    bool led6_status = false;
-    bool led7_status = false;
-    bool led8_status = false;
-    bool led9_orange_status = false;
-    bool led9_blue_status = false;
+  // Init state machine
+  bool initialized_{false};
+  uint8_t init_step_{0};
+  uint32_t init_last_{0};
+  static constexpr uint32_t INIT_INTERVAL_MS = 50;
+
+  // Communication buffers
+  uint8_t send_buffer_[11]{};
+  uint8_t recv_buffer_[10]{};
+
+  // Communication timing
+  uint32_t mcu_interval_{100};
+  uint32_t mcu_last_{0};
+
+  // Display state
+  uint8_t hours_{0};
+  uint8_t minutes_{0};
+  bool power_{false};
+  bool sleep_{false};
+  bool middle_dots_{true};
+
+  // Temperature from MCU
+  uint8_t top_temperature_{0};
+  uint8_t bottom_temperature_{0};
+
+  // LED status
+  bool led1_status_{false};
+  bool led2_status_{false};
+  bool led3_status_{false};
+  bool led4_status_{false};
+  bool led5_status_{false};
+  bool led6_status_{false};
+  bool led7_status_{false};
+  bool led8_status_{false};
+  bool led9_orange_status_{false};
+  bool led9_blue_status_{false};
 };
 
-} // namespace ricecooker
-} // namespace esphome
+}  // namespace esphome::ricecooker
