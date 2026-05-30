@@ -31,9 +31,12 @@ class RiceCooker : public Component, public uart::UARTDevice {
   void set_program_select(select::Select *program_select) { program_select_ = program_select; }
 
   // --- Configuration setters (called from Python codegen) ---
-  void set_keep_warm_temperature(uint8_t temp) { keep_warm_.set_target_temperature(temp); }
-  void set_keep_warm_hysteresis(uint8_t hysteresis) { keep_warm_.set_hysteresis(hysteresis); }
-  void set_rice_cooking_time(uint8_t time) { rice_program_.set_cooking_time(time); }
+  void set_keep_warm_temperature(uint8_t temp) { keep_warm_temperature_ = temp; }
+  void set_keep_warm_hysteresis(uint8_t hysteresis) { keep_warm_hysteresis_ = hysteresis; }
+
+  // --- Custom program creation (called from Python codegen) ---
+  void add_custom_program(const std::string &name, bool keep_warm_after);
+  void add_program_stage(uint8_t target_temperature, uint8_t hysteresis, uint32_t duration_ms, bool hold = false);
 
   // --- Control methods (callable from YAML lambdas) ---
   void start();
@@ -54,8 +57,8 @@ class RiceCooker : public Component, public uart::UARTDevice {
   bool get_power();
   const char *get_program_name();
 
-  // --- Program accessors (for auto-transition to keep-warm) ---
-  KeepWarm &get_keep_warm() { return keep_warm_; }
+  // --- Program list (for select platform) ---
+  std::vector<const char *> get_program_names() const;
 
   // --- Component overrides ---
   void setup() override;
@@ -79,10 +82,14 @@ class RiceCooker : public Component, public uart::UARTDevice {
   int hours_{0};
   int minutes_{0};
 
-  // Pre-allocated programs (no heap allocation needed)
-  KeepWarm keep_warm_{65, 5};
-  RiceProgram rice_program_{15, 100, false};
-  RiceProgram fast_rice_program_{15, 100, true};
+  // Keep warm settings (used when keep_warm_after=true)
+  uint8_t keep_warm_temperature_{65};
+  uint8_t keep_warm_hysteresis_{5};
+
+  // Custom programs (YAML-defined), heap-allocated during setup
+  std::vector<ProfileProgram *> custom_programs_{};
+
+  // Currently active program (points into custom_programs_ or is nullptr)
   Program *current_program_{nullptr};
 
   Heater heater_;
@@ -94,7 +101,6 @@ class RiceCookerPowerSwitch : public switch_::Switch, public Component {
   void set_ricecooker(RiceCooker *ricecooker) { ricecooker_ = ricecooker; }
 
   void write_state(bool state) override;
-
   void dump_config() override;
 
  private:

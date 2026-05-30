@@ -1,6 +1,7 @@
 #include "ricecooker.h"
 
 #include "esphome/core/log.h"
+#include "esphome/core/helpers.h"
 
 namespace esphome::ricecooker {
 
@@ -9,30 +10,44 @@ namespace esphome::ricecooker {
 // ============================================================================
 
 void RiceCooker::setup() {
-  // Initialize MCU communicator with our UART device
   mcu_communicator_.set_uart_device(this);
-  ESP_LOGCONFIG(TAG, "Rice Cooker initialized");
+
+  // Append keep-warm stages to programs that have keep_warm_after=true
+  for (auto *prog : custom_programs_) {
+    if (prog->keep_warm_after()) {
+      prog->add_stage(keep_warm_temperature_, keep_warm_hysteresis_, 0, true);
+    }
+  }
+}
+
+void RiceCooker::dump_config() {
+  ESP_LOGCONFIG(TAG, "Rice Cooker:");
+  ESP_LOGCONFIG(TAG, "  Keep Warm Temperature: %d°C", keep_warm_temperature_);
+  ESP_LOGCONFIG(TAG, "  Keep Warm Hysteresis: %d°C", keep_warm_hysteresis_);
+  ESP_LOGCONFIG(TAG, "  Programs: %zu", custom_programs_.size());
+  for (auto *prog : custom_programs_) {
+    ESP_LOGCONFIG(TAG, "    - %s (%zu stages, keep_warm_after: %s)",
+                  prog->get_name(), prog->stage_count(),
+                  prog->keep_warm_after() ? "true" : "false");
+  }
+  LOG_SENSOR("  ", "Top Temperature", sensor_top_);
+  LOG_SENSOR("  ", "Bottom Temperature", sensor_bottom_);
 }
 
 void RiceCooker::loop() {
-  // Update MCU communication (handles init state machine and periodic send/receive)
   mcu_communicator_.loop();
 
-  // Don't process data until MCU is initialized
   if (!mcu_communicator_.is_initialized()) {
     return;
   }
 
-  // Update heater with latest temperature data
   uint8_t top_temp = mcu_communicator_.get_top_temperature();
   uint8_t bottom_temp = mcu_communicator_.get_bottom_temperature();
   heater_.update(top_temp, bottom_temp);
 
-  // Periodic processing every relay_interval
   if (millis() > relay_last_ + relay_interval_) {
     relay_last_ = millis();
 
-    // Publish sensor data
     if (sensor_top_ != nullptr) {
       sensor_top_->publish_state(top_temp);
     }
@@ -40,30 +55,30 @@ void RiceCooker::loop() {
       sensor_bottom_->publish_state(bottom_temp);
     }
 
-    // Step the current program
     if (current_program_ != nullptr) {
       current_program_->step(&heater_);
       heater_.step(millis());
 
-      // Auto-transition to Keep Warm when a program finishes
       auto remaining = current_program_->remaining_time();
       if (remaining.has_value() && *remaining <= 0) {
+        // Program finished — stop heater
         heater_.power_off();
-        select_program(&keep_warm_);
-        current_program_->start();
+        select_program(nullptr);
+        ESP_LOGI(TAG, "Program finished");
       }
     } else {
       ESP_LOGVV(TAG, "No program selected");
     }
   }
 
-  // Update display time based on program or temperature
+  // Update display
   if (current_program_ != nullptr) {
     auto remaining = current_program_->remaining_time();
     if (remaining.has_value()) {
       hours_ = *remaining / 60;
       minutes_ = *remaining % 60;
     } else {
+      // Infinite program (hold stage) — show temperature
       hours_ = top_temp;
       minutes_ = bottom_temp;
     }
@@ -72,18 +87,35 @@ void RiceCooker::loop() {
     minutes_ = bottom_temp;
   }
 
-  // Update MCU display
   mcu_communicator_.set_time(hours_, minutes_);
   mcu_communicator_.set_power(heater_.get_power());
 }
 
-void RiceCooker::dump_config() {
-  ESP_LOGCONFIG(TAG, "Rice Cooker:");
-  ESP_LOGCONFIG(TAG, "  Keep Warm Temperature: %d°C", keep_warm_.get_target_temperature());
-  ESP_LOGCONFIG(TAG, "  Keep Warm Hysteresis: %d°C", keep_warm_.get_hysteresis());
-  ESP_LOGCONFIG(TAG, "  Rice Cooking Time: %d min", rice_program_.get_cooking_time());
-  LOG_SENSOR("  ", "Top Temperature", sensor_top_);
-  LOG_SENSOR("  ", "Bottom Temperature", sensor_bottom_);
+// --- Custom program creation (called from Python codegen) ---
+
+void RiceCooker::add_custom_program(const std::string &name, bool keep_warm_after) {
+  auto *prog = new ProfileProgram();
+  prog->set_name(name);
+  prog->set_keep_warm_after(keep_warm_after);
+  custom_programs_.push_back(prog);
+  ESP_LOGD(TAG, "Added custom program: %s (keep_warm_after: %s)",
+           name.c_str(), keep_warm_after ? "true" : "false");
+}
+
+void RiceCooker::add_program_stage(uint8_t target_temperature, uint8_t hysteresis, uint32_t duration_ms, bool hold) {
+  if (!custom_programs_.empty()) {
+    custom_programs_.back()->add_stage(target_temperature, hysteresis, duration_ms, hold);
+  }
+}
+
+// --- Program list ---
+
+std::vector<const char *> RiceCooker::get_program_names() const {
+  std::vector<const char *> names = {NONE_NAME};
+  for (auto *prog : custom_programs_) {
+    names.push_back(prog->get_name());
+  }
+  return names;
 }
 
 // --- Control methods ---
@@ -134,43 +166,41 @@ void RiceCooker::cancel() {
 }
 
 void RiceCooker::set_program_by_name(const std::string &name) {
-  Program *program = nullptr;
-  if (name == KEEP_WARM_NAME) {
-    program = &keep_warm_;
-  } else if (name == RICE_NAME) {
-    program = &rice_program_;
-  } else if (name == FAST_RICE_NAME) {
-    program = &fast_rice_program_;
-  } else if (name == NONE_NAME) {
-    program = nullptr;
-  } else {
-    ESP_LOGW(TAG, "Unknown program: %s", name.c_str());
+  if (name == NONE_NAME) {
+    select_program(nullptr);
     return;
   }
-  select_program(program);
+
+  // Search custom programs
+  for (auto *prog : custom_programs_) {
+    if (name == prog->get_name()) {
+      select_program(prog);
+      return;
+    }
+  }
+
+  ESP_LOGW(TAG, "Unknown program: %s", name.c_str());
 }
 
 void RiceCooker::select_program(Program *program) {
-  // Cancel the current program
+  // Cancel current program
   if (current_program_ != nullptr) {
     current_program_->cancel();
   }
 
-  // Reset heater state for new program
   heater_.reset();
-
   current_program_ = program;
 
-  ESP_LOGD(TAG, "Selected program: %s", program ? program->get_name() : NONE_NAME);
+  if (program != nullptr) {
+    ESP_LOGI(TAG, "Selected program: %s", program->get_name());
+    program->start();
+  } else {
+    ESP_LOGI(TAG, "No program selected");
+  }
 
   // Update the select entity to reflect the current program
   if (program_select_ != nullptr) {
     program_select_->publish_state(program ? program->get_name() : NONE_NAME);
-  }
-
-  // Start the new program
-  if (program != nullptr) {
-    program->start();
   }
 }
 
@@ -194,12 +224,26 @@ void RiceCookerPowerSwitch::dump_config() { ESP_LOGCONFIG(TAG, "Rice Cooker Powe
 // ============================================================================
 
 void RiceCookerProgramSelect::setup() {
-  this->traits.set_options({NONE_NAME, KEEP_WARM_NAME, RICE_NAME, FAST_RICE_NAME});
+  // Build full options list including custom programs from RiceCooker
+  auto names = ricecooker_->get_program_names();
+  FixedVector<const char *> options;
+  for (const char *name : names) {
+    options.push_back(name);
+  }
+  this->traits.set_options(options);
+
+  // Default to "None"
   this->publish_state(NONE_NAME);
 }
 
 void RiceCookerProgramSelect::control(const std::string &value) { ricecooker_->set_program_by_name(value); }
 
-void RiceCookerProgramSelect::dump_config() { ESP_LOGCONFIG(TAG, "Rice Cooker Program Select"); }
+void RiceCookerProgramSelect::dump_config() {
+  ESP_LOGCONFIG(TAG, "Rice Cooker Program Select");
+  auto names = ricecooker_->get_program_names();
+  for (const char *name : names) {
+    ESP_LOGCONFIG(TAG, "  Option: %s", name);
+  }
+}
 
 }  // namespace esphome::ricecooker

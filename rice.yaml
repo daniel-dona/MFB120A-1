@@ -18,10 +18,8 @@ esp32:
       ignore_efuse_mac_crc: true
       ignore_efuse_custom_mac: true
 
-# Make sure logging is not using the serial port
 logger:
 
-# Enable Home Assistant API
 api:
   encryption:
     key: !secret api_key
@@ -33,12 +31,9 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
-
-  # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
     ssid: ${name}
     password: !secret wifi_password
-
   on_connect:
     - lambda:
         id(ricecooker_1).set_wifi(true);
@@ -59,7 +54,85 @@ ricecooker:
   uart_id: uart_bus
   keep_warm_temperature: 65
   keep_warm_hysteresis: 5
-  rice_cooking_time: 15
+
+  programs:
+    # ─── Mantener caliente ─────────────────────────────────
+    # Infinite hold at 65°C until cancelled
+    - name: "Mantener Caliente"
+      stages:
+        - target_temperature: 65
+          hysteresis: 5
+          hold: true
+
+    # ─── Arroz ──────────────────────────────────────────────
+    # Full rice cooking cycle: soak → heat → cook → rest → keep warm
+    - name: "Arroz"
+      keep_warm_after: true
+      stages:
+        - target_temperature: 60
+          hysteresis: 0        # Reach 60°C, then advance
+        - target_temperature: 65
+          hysteresis: 5
+          duration: 45min      # Soak
+        - target_temperature: 95
+          hysteresis: 2        # Heat until 95°C
+        - target_temperature: 100
+          hysteresis: 1
+          duration: 8min       # Cook first half
+        - target_temperature: 100
+          hysteresis: 0
+          duration: 7min       # Cook second half (vapor phase)
+        - target_temperature: 65
+          hysteresis: 4
+          duration: 10min      # Rest
+
+    # ─── Arroz Rápido ──────────────────────────────────────
+    # Quick rice: heat → cook → rest → keep warm
+    - name: "Arroz Rapido"
+      keep_warm_after: true
+      stages:
+        - target_temperature: 60
+          hysteresis: 0
+        - target_temperature: 95
+          hysteresis: 2
+        - target_temperature: 100
+          hysteresis: 1
+          duration: 15min
+        - target_temperature: 65
+          hysteresis: 4
+          duration: 10min
+
+    # ─── Cebolla Caramelizada ───────────────────────────────
+    # Low and slow: sweat → caramelize → finish → keep warm
+    - name: "Cebolla Caramelizada"
+      keep_warm_after: true
+      stages:
+        - target_temperature: 80
+          hysteresis: 3        # Sweat the onions
+        - target_temperature: 88
+          hysteresis: 3
+          duration: 40min      # Caramelize
+        - target_temperature: 75
+          hysteresis: 2
+          duration: 15min      # Deep flavor
+
+    # ─── Cocción Lenta ──────────────────────────────────────
+    # Generic slow cooker: configurable temperature and duration
+    - name: "Coccion Lenta"
+      keep_warm_after: true
+      stages:
+        - target_temperature: 90
+          hysteresis: 3
+          duration: 120min
+
+    # ─── Yogur ──────────────────────────────────────────────
+    # Gentle fermentation at 43°C for 8 hours, no keep warm after
+    - name: "Yogur"
+      keep_warm_after: false
+      stages:
+        - target_temperature: 43
+          hysteresis: 2
+          duration: 8h
 
 sensor:
   - platform: ricecooker
@@ -79,7 +152,7 @@ select:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
     program:
-      name: "Mode Select"
+      name: "Modo"
 
 button:
   - platform: template

@@ -1,6 +1,9 @@
 #pragma once
 
 #include <optional>
+#include <string>
+#include <vector>
+#include <cstdint>
 
 #include "esphome/core/component.h"
 
@@ -8,81 +11,97 @@ namespace esphome::ricecooker {
 
 class Heater;
 
-// Program name strings (shared across all instances)
-static const char *const KEEP_WARM_NAME = "Keep Warm";
-static const char *const RICE_NAME = "Rice";
-static const char *const FAST_RICE_NAME = "Fast Rice";
+// Program name for "no program selected"
 static const char *const NONE_NAME = "None";
 
+/// Base class for all cooking programs.
+/// A program runs through a sequence of stages and controls the heater
+/// to reach/maintain target temperatures.
 class Program {
  public:
   virtual ~Program() = default;
 
   virtual void step(Heater *heater) = 0;
   virtual const char *get_name() const = 0;
-
-  /// Starts the program. If previously cancelled, starts from the beginning.
   virtual void start() = 0;
-
-  /// Cancels the program, resetting its state.
   virtual void cancel() = 0;
-
-  /// Returns remaining time in minutes, or nullopt if infinite/unknown.
   virtual std::optional<unsigned int> remaining_time() { return std::nullopt; }
-
-  /// Resets the program state for reuse.
   virtual void reset() = 0;
+
+  /// Whether to auto-transition to keep warm when program finishes.
+  virtual bool keep_warm_after() const { return true; }
 };
 
-class KeepWarm : public Program {
+/// A generic profile-based program defined by a sequence of temperature stages.
+///
+/// Each stage is one of three types:
+///   - **Transitional** (no duration, no hold): advance to next stage when
+///     target temperature is reached.
+///   - **Timed hold** (duration > 0, no hold): maintain temperature for the
+///     specified duration, then advance.
+///   - **Infinite hold** (hold = true): maintain temperature indefinitely
+///     until the user cancels. Typically used as the last stage for
+///     "keep warm" programs.
+///
+/// Example YAML for caramelized onions:
+///
+///   programs:
+///     - name: "Cebolla Caramelizada"
+///       keep_warm_after: true
+///       stages:
+///         - target_temperature: 80
+///           hysteresis: 3
+///         - target_temperature: 88
+///           hysteresis: 3
+///           duration: 40min
+///         - target_temperature: 75
+///           hysteresis: 2
+///           duration: 15min
+class ProfileProgram : public Program {
  public:
-  KeepWarm(uint8_t target_temp, uint8_t hysteresis);
+  ProfileProgram() = default;
 
   void step(Heater *heater) override;
-  const char *get_name() const override { return KEEP_WARM_NAME; }
-  void start() override;
-  void cancel() override;
-  void reset() override { stage_ = Wait; }
-
-  void set_target_temperature(uint8_t temp) { target_temp_ = temp; }
-  void set_hysteresis(uint8_t hysteresis) { hysteresis_ = hysteresis; }
-  uint8_t get_target_temperature() const { return target_temp_; }
-  uint8_t get_hysteresis() const { return hysteresis_; }
-
- private:
-  uint8_t target_temp_;
-  uint8_t hysteresis_;
-
-  enum Stage { Wait, Warm } stage_{Wait};
-};
-
-class RiceProgram : public Program {
- public:
-  RiceProgram(uint8_t cooking_time, uint8_t cooking_temp = 100, bool fast = false);
-
-  void step(Heater *heater) override;
-  const char *get_name() const override;
+  const char *get_name() const override { return name_.c_str(); }
   void start() override;
   void cancel() override;
   void reset() override;
   std::optional<unsigned int> remaining_time() override;
+  bool keep_warm_after() const override { return keep_warm_after_; }
 
-  void set_cooking_time(uint8_t time) { cooking_time_ = time; }
-  uint8_t get_cooking_time() const { return cooking_time_; }
+  void set_name(const std::string &name) { name_ = name; }
+  void set_keep_warm_after(bool keep_warm) { keep_warm_after_ = keep_warm; }
+
+  /// Add a stage to this program.
+  /// @param target_temperature  Target temperature in °C
+  /// @param hysteresis          Hysteresis band for power modulation in °C
+  /// @param duration_ms        Hold time in ms (0 = transitional, advance when temp reached)
+  /// @param hold               true = infinite hold (never advance)
+  void add_stage(uint8_t target_temperature, uint8_t hysteresis, uint32_t duration_ms, bool hold = false);
+
+  /// Number of stages in this program.
+  size_t stage_count() const { return stages_.size(); }
 
  private:
-  // Configuration
-  uint8_t cooking_time_;
-  uint8_t cooking_temp_;
-  bool fast_;
+  struct Stage {
+    uint8_t target_temperature;
+    uint8_t hysteresis;
+    uint32_t duration_ms;  // 0 = transitional (advance when reached), >0 = timed hold
+    bool hold;             // true = infinite hold, never advance
+  };
 
-  // State
-  enum Stage { Wait, Start, Soak, Heat, Cook, Vapor, Rest } stage_{Wait};
+  std::string name_;
+  bool keep_warm_after_{true};
+  std::vector<Stage> stages_;
+
+  // Runtime state
+  size_t current_stage_index_{0};
+  bool target_reached_{false};
   uint32_t stage_started_{0};
+  bool started_{false};
   bool finished_{false};
-  uint8_t vapor_max_{0};
 
-  void set_stage(Stage stage);
+  void advance_stage();
 };
 
 }  // namespace esphome::ricecooker
