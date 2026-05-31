@@ -2,3 +2,5 @@
 secrets.yaml
 *.pyc
 .venvsecrets.yaml
+.venv/
+.esphome/

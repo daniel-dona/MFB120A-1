@@ -49,75 +49,221 @@ uart:
     rx_pin: GPIO32
     baud_rate: 9600
 
+# ============================================================================
+# Rice cooker component with YAML-defined cooking programs.
+#
+# Stage types:
+#   - transitional: advance when bottom temp reaches target (no duration/hold)
+#   - timed hold:    maintain temp for duration, then advance
+#   - infinite hold: maintain temp until cancelled (hold: true)
+#
+# Safety (always active, built-in):
+#   - Emergency shutoff if plate > 120°C
+#   - Emergency shutoff if lid > 84°C during hold
+#
+# Per-stage options:
+#   target_temperature: °C setpoint for bang-bang control (required)
+#   hysteresis:         ±°C tolerance band (default: 3)
+#   duration:           hold time (mutually exclusive with hold)
+#   hold: true          infinite hold until cancelled
+#   top_threshold:      °C, advance if lid reaches this (default: 0=disabled)
+#   bottom_threshold:   °C, advance if plate reaches this (default: 0=disabled)
+#   power:              heater power level 0-28 (default: 255=auto)
+# ============================================================================
+
 ricecooker:
   id: ricecooker_1
   uart_id: uart_bus
-  keep_warm_temperature: 65
-  keep_warm_hysteresis: 5
+  keep_warm_temperature: 75    # °C, used by auto keep-warm
+  keep_warm_hysteresis: 4      # ±°C, used by auto keep-warm
 
   programs:
-    # ─── Mantener caliente ─────────────────────────────────
-    # Infinite hold at 65°C until cancelled
+    # ─── Mantener Caliente (Keep Warm) ─────────────────────
+    # Infinite hold at 75°C. Matches firmware how=0x0C bang-bang algorithm.
     - name: "Mantener Caliente"
+      keep_warm_after: false    # Already a hold stage, don't append another
       stages:
-        - target_temperature: 65
-          hysteresis: 5
+        - target_temperature: 75
+          hysteresis: 4
           hold: true
+          power: 6
 
-    # ─── Arroz ──────────────────────────────────────────────
-    # Full rice cooking cycle: soak → heat → cook → rest → keep warm
+    # ─── Arroz (White Rice) ─────────────────────────────────
+    # 60-min cycle matching original firmware how=2.
+    # Phase 0 (warmup) → Phase 1 (early soak) → Phase 2 (main soak) →
+    # Phase 3 (pre-boil sub-phases 73→82→84°C) → Phase 4-5 (steam) →
+    # Phase 6-7 (steam cycle) → auto keep-warm at 75°C
     - name: "Arroz"
       keep_warm_after: true
       stages:
-        - target_temperature: 60
-          hysteresis: 0        # Reach 60°C, then advance
-        - target_temperature: 65
-          hysteresis: 5
-          duration: 45min      # Soak
-        - target_temperature: 95
-          hysteresis: 2        # Heat until 95°C
-        - target_temperature: 100
-          hysteresis: 1
-          duration: 8min       # Cook first half
-        - target_temperature: 100
-          hysteresis: 0
-          duration: 7min       # Cook second half (vapor phase)
-        - target_temperature: 65
-          hysteresis: 4
-          duration: 10min      # Rest
+        # P0: Warmup check (32s, heater off)
+        - target_temperature: 25
+          hysteresis: 3
+          duration: 32s
+          power: 0
 
-    # ─── Arroz Rápido ──────────────────────────────────────
-    # Quick rice: heat → cook → rest → keep warm
+        # P1: Early soak (3min, heat to 45°C, full power)
+        - target_temperature: 45
+          hysteresis: 2
+          duration: 180s
+          power: 28
+
+        # P2: Main soak (40min, heat to 60°C, full power)
+        # Firmware advances at 40min OR plate≥130°C (safety)
+        - target_temperature: 60
+          hysteresis: 3
+          duration: 2400s
+          bottom_threshold: 130
+          power: 28
+
+        # P3 sub0: Pre-boil heat to 73°C
+        - target_temperature: 100
+          hysteresis: 2
+          bottom_threshold: 73
+          power: 8
+
+        # P3 sub1: Pre-boil heat to 82°C
+        - target_temperature: 100
+          hysteresis: 2
+          bottom_threshold: 82
+          power: 12
+
+        # P3 sub2: Pre-boil heat to 84°C
+        - target_temperature: 100
+          hysteresis: 2
+          bottom_threshold: 84
+          power: 14
+
+        # P3 sub3: Boil phase (full power until water absorbed)
+        - target_temperature: 135
+          hysteresis: 3
+          bottom_threshold: 130
+          power: 15
+
+        # P5: Transition / steam
+        - target_temperature: 120
+          hysteresis: 5
+          duration: 300s
+          power: 8
+
+        # P6-P7: Steam cycle (30min)
+        - target_temperature: 125
+          hysteresis: 5
+          duration: 1800s
+          bottom_threshold: 130
+          power: 10
+
+        # P8: Cool-down (brief)
+        - target_temperature: 105
+          hysteresis: 5
+          duration: 120s
+          power: 4
+
+    # ─── Arroz Integral (Brown Rice) ────────────────────────
+    # 105-min cycle matching original firmware how=3.
+    - name: "Arroz Integral"
+      keep_warm_after: true
+      stages:
+        # P0: Warmup (32s)
+        - target_temperature: 25
+          hysteresis: 3
+          duration: 32s
+          power: 0
+
+        # P3: Long soak (30min, heat slowly)
+        - target_temperature: 60
+          hysteresis: 5
+          duration: 1800s
+          bottom_threshold: 130
+          power: 28
+
+        # P3 sub0: Brown rice pre-heat to 73°C
+        - target_temperature: 100
+          hysteresis: 3
+          bottom_threshold: 73
+          power: 8
+
+        # P3 sub1: Brown rice pre-heat to 75°C
+        - target_temperature: 100
+          hysteresis: 3
+          bottom_threshold: 75
+          power: 8
+
+        # P3 sub2: Brown rice pre-heat to 80°C
+        - target_temperature: 100
+          hysteresis: 3
+          bottom_threshold: 80
+          power: 10
+
+        # P3 sub3: Boil phase (until water absorbed)
+        - target_temperature: 128
+          hysteresis: 3
+          bottom_threshold: 130
+          power: 15
+
+        # P7: Simmer (30min)
+        - target_temperature: 128
+          hysteresis: 5
+          duration: 1800s
+          power: 6
+
+        # P8: Rest (15min)
+        - target_temperature: 125
+          hysteresis: 5
+          duration: 900s
+          power: 4
+
+    # ─── Arroz Rápido (Quick Rice) ─────────────────────────
+    # Shorter cycle for quick white rice (~30min)
     - name: "Arroz Rapido"
       keep_warm_after: true
       stages:
+        # Heat to soak temp
         - target_temperature: 60
-          hysteresis: 0
-        - target_temperature: 95
           hysteresis: 2
-        - target_temperature: 100
-          hysteresis: 1
-          duration: 15min
-        - target_temperature: 65
-          hysteresis: 4
-          duration: 10min
 
-    # ─── Cebolla Caramelizada ───────────────────────────────
-    # Low and slow: sweat → caramelize → finish → keep warm
+        # Brief soak
+        - target_temperature: 60
+          hysteresis: 5
+          duration: 300s
+
+        # Quick heat to boil
+        - target_temperature: 100
+          hysteresis: 2
+          bottom_threshold: 84
+
+        # Cook at boil
+        - target_temperature: 100
+          hysteresis: 2
+          duration: 600s
+
+        # Steam rest
+        - target_temperature: 105
+          hysteresis: 5
+          duration: 300s
+
+    # ─── Cebolla Caramelizada (Caramelized Onions) ──────────
+    # Low and slow: sweat → caramelize → finish
     - name: "Cebolla Caramelizada"
       keep_warm_after: true
       stages:
+        # Sweat the onions (low temp until soft)
         - target_temperature: 80
-          hysteresis: 3        # Sweat the onions
+          hysteresis: 3
+          bottom_threshold: 85
+
+        # Caramelize slowly (40min medium-low)
         - target_temperature: 88
           hysteresis: 3
-          duration: 40min      # Caramelize
+          duration: 40min
+
+        # Deep flavor development
         - target_temperature: 75
           hysteresis: 2
-          duration: 15min      # Deep flavor
+          duration: 15min
 
-    # ─── Cocción Lenta ──────────────────────────────────────
-    # Generic slow cooker: configurable temperature and duration
+    # ─── Cocción Lenta (Slow Cook) ──────────────────────────
+    # Generic slow cooker, 2h at ~90°C
     - name: "Coccion Lenta"
       keep_warm_after: true
       stages:
@@ -125,8 +271,8 @@ ricecooker:
           hysteresis: 3
           duration: 120min
 
-    # ─── Yogur ──────────────────────────────────────────────
-    # Gentle fermentation at 43°C for 8 hours, no keep warm after
+    # ─── Yogur (Yogurt) ─────────────────────────────────────
+    # Gentle fermentation at 43°C for 8h, no keep-warm after
     - name: "Yogur"
       keep_warm_after: false
       stages:
@@ -134,35 +280,103 @@ ricecooker:
           hysteresis: 2
           duration: 8h
 
+    # ─── Recalentar (Reheat) ────────────────────────────────
+    # Reheat previously cooked food to serving temperature (~75°C)
+    - name: "Recalentar"
+      keep_warm_after: true
+      stages:
+        - target_temperature: 75
+          hysteresis: 4
+          duration: 15min
+          power: 8
+
+    # ─── Al Vapor (Steam) ──────────────────────────────────
+    # Steam cooking, ~30min at high temp
+    - name: "Al Vapor"
+      keep_warm_after: true
+      stages:
+        # Heat to steam temp quickly
+        - target_temperature: 100
+          hysteresis: 3
+          bottom_threshold: 89
+          power: 28
+
+        # Steam cycle (30min)
+        - target_temperature: 100
+          hysteresis: 2
+          duration: 30min
+          power: 17
+
+        # Brief rest
+        - target_temperature: 85
+          hysteresis: 5
+          duration: 5min
+          power: 4
+
+    # ─── Congee (Porridge) ──────────────────────────────────
+    # Long slow cook for rice porridge, ~90min
+    - name: "Congee"
+      keep_warm_after: true
+      stages:
+        # Heat to soak temp
+        - target_temperature: 60
+          hysteresis: 5
+          duration: 300s
+          bottom_threshold: 130
+          power: 28
+
+        # Extended soak / warm-up
+        - target_temperature: 80
+          hysteresis: 3
+          duration: 1800s
+          bottom_threshold: 87
+          power: 24
+
+        # Slow cook at near-boil
+        - target_temperature: 100
+          hysteresis: 3
+          duration: 3600s
+          bottom_threshold: 130
+          power: 12
+
+        # Simmer down
+        - target_temperature: 90
+          hysteresis: 3
+          duration: 900s
+          power: 5
+
+# ============================================================================
+# Entities
+# ============================================================================
+
 sensor:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
     top_temperature:
-      name: "Sensor top"
+      name: "Temperatura superior"
     bottom_temperature:
-      name: "Sensor bottom"
+      name: "Temperatura inferior"
 
 switch:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
     power:
-      name: "Power"
+      name: "Encendido"
 
 select:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
-    program:
-      name: "Modo"
+    name: "Modo"
 
 button:
   - platform: template
-    name: "Start"
+    name: "Iniciar"
     on_press:
       - lambda:
           id(ricecooker_1).start();
 
   - platform: template
-    name: "Cancel"
+    name: "Cancelar"
     on_press:
       - lambda:
           id(ricecooker_1).cancel();

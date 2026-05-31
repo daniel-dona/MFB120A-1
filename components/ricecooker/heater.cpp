@@ -4,18 +4,18 @@
 
 namespace esphome::ricecooker {
 
-static const char *const TAG = "ricecooker";
+static const char *const TAG = "ricecooker_heater";
 
 void Heater::power_on() {
-  if (!power_) {
-    ESP_LOGD(TAG, "Heater power: on");
+  if (!power_ && !emergency_) {
+    ESP_LOGD(TAG, "Heater: ON");
     power_ = true;
   }
 }
 
 void Heater::power_off() {
   if (power_) {
-    ESP_LOGD(TAG, "Heater power: off");
+    ESP_LOGD(TAG, "Heater: OFF");
     power_ = false;
   }
 }
@@ -27,86 +27,80 @@ void Heater::power_modulate(uint8_t target_temp, uint8_t hysteresis) {
 
 void Heater::reset() {
   power_off();
-  just_reset_ = true;
-
   max_target_ = 0;
   min_target_ = 0;
+  power_level_ = 28;
+  cycle_start_ms_ = 0;
+}
 
-  power_remain_ = 0;
-  power_wait_remain_ = 0;
-  power_modulate_last_ = 0;
-
-  last_max_target_ = 0;
-  last_power_time_ = 0;
+void Heater::emergency_off() {
+  power_off();
+  power_level_ = 0;
+  emergency_ = true;
+  ESP_LOGE(TAG, "Heater: EMERGENCY OFF");
 }
 
 void Heater::update(uint8_t top_temp, uint8_t bottom_temp) {
   top_temperature_ = top_temp;
   bottom_temperature_ = bottom_temp;
-  max_temperature_ = std::max(max_temperature_, bottom_temp);
 }
 
-void Heater::step(uint32_t millis) {
-  int32_t lapsed = millis - power_modulate_last_;
-  power_modulate_last_ = millis;
+uint32_t Heater::get_on_time_ms() const {
+  if (power_level_ == 0 || emergency_) {
+    return 0;
+  }
+  if (power_level_ >= MAX_POWER) {
+    return cycle_period_;  // 100% duty cycle
+  }
+  // Linear mapping: power 1-27 maps to 1/28 to 27/28 of cycle
+  return (static_cast<uint32_t>(power_level_) * cycle_period_) / MAX_POWER;
+}
 
-  if (power_remain_ != 0) {
-    power_remain_ = std::max(static_cast<int32_t>(1), power_remain_ - lapsed);
+void Heater::step(uint32_t now_ms) {
+  if (emergency_) {
+    power_off();
+    return;
   }
 
-  power_wait_remain_ = std::max(static_cast<int32_t>(0), power_wait_remain_ - lapsed);
+  // If no targets are set, don't control the heater
+  if (max_target_ == 0 && min_target_ == 0) {
+    return;
+  }
 
-  if (bottom_temperature_ < min_target_ && power_remain_ == 0 && power_wait_remain_ == 0) {
-    power_on();
+  // Initialize cycle start time
+  if (cycle_start_ms_ == 0) {
+    cycle_start_ms_ = now_ms;
+  }
 
-    int range = static_cast<int32_t>(max_temperature_) - static_cast<int32_t>(last_min_temp_);
+  uint32_t on_time_ms = get_on_time_ms();
+  uint32_t elapsed = now_ms - cycle_start_ms_;
 
-    int32_t time_needed;
-    if (range >= 1) {
-      time_needed = last_power_time_ / range;
-    } else {
-      // Avoid division by zero.
-      // Temperature did not rise with last_power_time, so increment it
-      time_needed = last_power_time_ + last_power_time_ / 4;
-    }
+  // Check if we need to start a new cycle
+  if (elapsed >= cycle_period_) {
+    cycle_start_ms_ = now_ms;
+    elapsed = 0;
+  }
 
-    int32_t diff = static_cast<int32_t>(last_max_target_) - static_cast<int32_t>(max_temperature_);
-    diff = std::clamp(diff, static_cast<int32_t>(-3), static_cast<int32_t>(3));
-
-    int32_t error = time_needed - thermal_mass_;
-    ESP_LOGD(TAG, "In last heating: error %d ms/°C, diff %d°C", error, diff);
-
-    if (!just_reset_ && max_temperature_ < 100) {
-      // We cannot estimate thermal mass if heat is used to boil water
-      // instead of raising its temperature.
-      if (diff == 0) {
-        thermal_mass_ += std::clamp(error, static_cast<int32_t>(-200), static_cast<int32_t>(200));
-      } else if (diff > 0) {
-        thermal_mass_ += std::clamp(error, static_cast<int32_t>(200), static_cast<int32_t>(500 * diff));
-      } else {
-        thermal_mass_ += std::clamp(error, static_cast<int32_t>(-500 * (-diff)), static_cast<int32_t>(-200));
-      }
-    }
-
-    power_remain_ = (max_target_ - bottom_temperature_) * thermal_mass_;
-
-    last_max_target_ = max_target_;
-    max_temperature_ = bottom_temperature_;
-    last_min_temp_ = bottom_temperature_;
-    last_power_time_ = power_remain_;
-    just_reset_ = false;
-
-    ESP_LOGD(TAG, "Power modulating: heating ON for %d ms, Thermal mass %d ms/°C", power_remain_,
-             thermal_mass_);
-
-  } else if (bottom_temperature_ >= max_target_ || power_remain_ == 1) {
+  // Temperature feedback has priority over power cycle
+  // If bottom temp exceeds max target, force OFF regardless of cycle
+  if (bottom_temperature_ >= max_target_) {
     power_off();
-    power_remain_ = 0;
-    power_wait_remain_ = 30000;
+    return;
+  }
 
+  // If bottom temp is well below min target, force ON regardless of cycle
+  if (bottom_temperature_ < min_target_ && power_level_ > 0) {
+    power_on();
+    return;
+  }
+
+  // Within hysteresis band: follow power cycle timing
+  if (power_level_ == 0) {
+    power_off();
+  } else if (elapsed < on_time_ms) {
+    power_on();
   } else {
-    ESP_LOGD(TAG, "Power modulating: power remaining %d ms, power waiting %d ms, Thermal mass %d ms/°C",
-             power_remain_, power_wait_remain_, thermal_mass_);
+    power_off();
   }
 }
 
