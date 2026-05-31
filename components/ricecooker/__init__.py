@@ -5,11 +5,6 @@ Provides flexible, YAML-driven cooking programs using three stage primitives:
   - timed hold (maintain temp for a duration, then advance)
   - infinite hold (maintain temp until cancelled)
 
-Safety mechanisms (always active, not configurable):
-  - Emergency shutoff if plate temp > 120°C
-  - Emergency shutoff if lid temp > 84°C during infinite hold
-  - Slow bang-bang relay control with configurable power levels
-
 Programs are 100% YAML — no C++ subclassing needed.
 """
 import esphome.codegen as cg
@@ -97,11 +92,17 @@ async def to_code(config):
     cg.add(var.set_keep_warm_temperature(config[CONF_KEEP_WARM_TEMPERATURE]))
     cg.add(var.set_keep_warm_hysteresis(config[CONF_KEEP_WARM_HYSTERESIS]))
 
+    # Store program names for select.py to use during codegen
+    import sys
+    _self = sys.modules[__name__]
+    _self._program_names = ["None"]
+
     for prog_config in config.get(CONF_PROGRAMS, []):
         cg.add(var.add_custom_program(
             prog_config[CONF_PROGRAM_NAME],
             prog_config[CONF_PROGRAM_KEEP_WARM_AFTER],
         ))
+        _self._program_names.append(prog_config[CONF_PROGRAM_NAME])
         for stage_config in prog_config["stages"]:
             duration_sec = stage_config.get(CONF_STAGE_DURATION)
             duration_ms = int(duration_sec.total_seconds * 1000) if duration_sec else 0

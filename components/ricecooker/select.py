@@ -2,7 +2,6 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.components import select
-from esphome.const import CONF_ID, CONF_NAME
 from . import RiceCooker, ricecooker_ns
 
 DEPENDENCIES = ["ricecooker"]
@@ -20,7 +19,12 @@ CONFIG_SCHEMA = select.select_schema(RiceCookerProgramSelect).extend({
 
 async def to_code(config):
     paren = await cg.get_variable(config[CONF_RICECOOKER_ID])
-    sel = cg.new_Pvariable(config[CONF_ID])
-    await select.register_select(sel, config, options=["None"])
+
+    import sys
+    from . import _program_names
+    options = _program_names if _program_names else ["None"]
+
+    sel = cg.new_Pvariable(config["id"])
+    await select.register_select(sel, config, options=options)
     await cg.register_component(sel, config)
     cg.add(sel.set_ricecooker(paren))

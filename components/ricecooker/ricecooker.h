@@ -104,6 +104,7 @@ class RiceCookerProgramSelect : public select::Select, public Component {
   void setup() override;
   void control(const std::string &value) override;
   void dump_config() override;
+  float get_setup_priority() const override { return setup_priority::DATA + 1.0f; }
  private:
   RiceCooker *ricecooker_{nullptr};
 };

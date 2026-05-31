@@ -25,7 +25,6 @@ void RiceCooker::setup() {
         break;
       case 0x84: // SELECT
         ESP_LOGI(TAG, "Physical button: SELECT");
-        // Cycle to next program
         {
           auto names = rc->get_program_names();
           const char *cur = rc->get_program_name();
@@ -37,28 +36,18 @@ void RiceCooker::setup() {
           rc->set_program_by_name(names[idx]);
         }
         break;
-      case 0x81: // TIMER
-        ESP_LOGI(TAG, "Physical button: TIMER (reservation not implemented)");
+      case 0x81:
+        ESP_LOGI(TAG, "Physical button: TIMER");
         break;
     }
   }, this);
 
-  // Append auto keep-warm stages to programs that have keep_warm_after=true
+  // Append auto keep-warm stages to programs
   for (auto *prog : custom_programs_) {
     if (prog->keep_warm_after()) {
       prog->add_stage(keep_warm_temperature_, keep_warm_hysteresis_,
                       0, true, 0, 0, 255);
     }
-  }
-
-  // Force select options refresh (in case select setup ran before ours)
-  if (program_select_ != nullptr) {
-    auto names = get_program_names();
-    esphome::FixedVector<const char *> options;
-    for (const char *name : names) {
-      options.push_back(name);
-    }
-    program_select_->traits.set_options(options);
   }
 }
 
@@ -279,12 +268,6 @@ void RiceCooker::select_program(ProfileProgram *program) {
 // ============================================================================
 
 void RiceCookerProgramSelect::setup() {
-  auto names = ricecooker_->get_program_names();
-  esphome::FixedVector<const char *> options;
-  for (const char *name : names) {
-    options.push_back(name);
-  }
-  this->traits.set_options(options);
   this->publish_state(NONE_NAME);
 }
 
