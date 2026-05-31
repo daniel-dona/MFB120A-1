@@ -7,9 +7,10 @@ namespace esphome::ricecooker {
 
 static const char *const TAG = "ricecooker_program";
 
-// Safety thresholds (matching original firmware E1-E2)
-static const uint8_t EMERGENCY_MAX_PLATE = 120;  // °C, immediate shutoff
-static const uint8_t EMERGENCY_MAX_LID_HOLD = 84; // °C, shutoff during keep-warm
+// Safety thresholds (matching original firmware)
+static const uint8_t EMERGENCY_MAX_PLATE = 130;    // °C, absolute max (firmware S3)
+static const uint8_t HOLD_MAX_PLATE = 104;        // °C, keep-warm max (firmware E1)
+static const uint8_t HOLD_MAX_LID = 84;           // °C, keep-warm max (firmware E2)
 
 void ProfileProgram::add_stage(uint8_t target_temperature, uint8_t hysteresis, uint32_t duration_ms,
                                 bool hold, uint8_t top_threshold, uint8_t bottom_threshold, uint8_t power) {
@@ -60,18 +61,38 @@ void ProfileProgram::step(Heater *heater) {
   uint8_t plate_temp = heater->get_bottom_temperature();
   uint8_t lid_temp = heater->get_top_temperature();
 
-  // E1: Emergency shutoff if plate exceeds safe limit
+  // S3: General emergency shutoff if plate exceeds absolute max (any mode)
   if (plate_temp > EMERGENCY_MAX_PLATE) {
     ESP_LOGE(TAG, "EMERGENCY: plate temp %d°C > %d°C, shutting down!", plate_temp, EMERGENCY_MAX_PLATE);
     do_emergency_shutdown(heater);
     return;
   }
 
-  // E2: Emergency shutoff during hold stages if lid exceeds safe limit
+  // E1 + E2: Emergency shutoff during hold/keep-warm stages
   if (current_stage_ < stages_.size()) {
     const Stage &s = stages_[current_stage_];
-    if (s.type == StageType::INFINITE_HOLD && lid_temp > EMERGENCY_MAX_LID_HOLD) {
-      ESP_LOGE(TAG, "EMERGENCY: lid temp %d°C > %d°C during hold, shutting down!", lid_temp, EMERGENCY_MAX_LID_HOLD);
+    if (s.type == StageType::INFINITE_HOLD) {
+      if (plate_temp > HOLD_MAX_PLATE) {
+        ESP_LOGE(TAG, "EMERGENCY: plate temp %d°C > %d°C during hold, shutting down!", plate_temp, HOLD_MAX_PLATE);
+        do_emergency_shutdown(heater);
+        return;
+      }
+      if (lid_temp > HOLD_MAX_LID) {
+        ESP_LOGE(TAG, "EMERGENCY: lid temp %d°C > %d°C during hold, shutting down!", lid_temp, HOLD_MAX_LID);
+        do_emergency_shutdown(heater);
+        return;
+      }
+    }
+  }
+  // Also apply hold limits during auto keep-warm (past all stages)
+  if (current_stage_ >= stages_.size() && keep_warm_after_) {
+    if (plate_temp > HOLD_MAX_PLATE) {
+      ESP_LOGE(TAG, "EMERGENCY: plate temp %d°C > %d°C during keep-warm, shutting down!", plate_temp, HOLD_MAX_PLATE);
+      do_emergency_shutdown(heater);
+      return;
+    }
+    if (lid_temp > HOLD_MAX_LID) {
+      ESP_LOGE(TAG, "EMERGENCY: lid temp %d°C > %d°C during keep-warm, shutting down!", lid_temp, HOLD_MAX_LID);
       do_emergency_shutdown(heater);
       return;
     }
