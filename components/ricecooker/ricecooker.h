@@ -5,7 +5,6 @@
 #include "esphome/components/uart/uart.h"
 #include "esphome/components/sensor/sensor.h"
 #include "esphome/components/select/select.h"
-#include "esphome/components/switch/switch.h"
 
 #include "program.h"
 #include "heater.h"
@@ -13,7 +12,6 @@
 
 namespace esphome::ricecooker {
 
-class RiceCookerPowerSwitch;
 class RiceCookerProgramSelect;
 
 static const char *const TAG = "ricecooker";
@@ -31,7 +29,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
   void set_sensor_temp_top(sensor::Sensor *s) { sensor_top_ = s; }
   void set_sensor_temp_bottom(sensor::Sensor *s) { sensor_bottom_ = s; }
   void set_sensor_voltage(sensor::Sensor *s) { sensor_voltage_ = s; }
-  void set_power_switch(switch_::Switch *s) { power_switch_ = s; }
+  void set_sensor_remaining(sensor::Sensor *s) { sensor_remaining_ = s; }
   void set_program_select(select::Select *s) { program_select_ = s; }
   void set_keep_warm_temperature(uint8_t temp) { keep_warm_temperature_ = temp; }
   void set_keep_warm_hysteresis(uint8_t hyst) { keep_warm_hysteresis_ = hyst; }
@@ -75,7 +73,7 @@ class RiceCooker : public Component, public uart::UARTDevice {
   sensor::Sensor *sensor_top_{nullptr};
   sensor::Sensor *sensor_bottom_{nullptr};
   sensor::Sensor *sensor_voltage_{nullptr};
-  switch_::Switch *power_switch_{nullptr};
+  sensor::Sensor *sensor_remaining_{nullptr};
   select::Select *program_select_{nullptr};
 
   // Timing
@@ -97,16 +95,6 @@ class RiceCooker : public Component, public uart::UARTDevice {
   // Sub-components
   Heater heater_{};
   MCUCommunicator mcu_communicator_{};
-};
-
-/// Power switch entity for Home Assistant.
-class RiceCookerPowerSwitch : public switch_::Switch, public Component {
- public:
-  void set_ricecooker(RiceCooker *rc) { ricecooker_ = rc; }
-  void write_state(bool state) override;
-  void dump_config() override;
- private:
-  RiceCooker *ricecooker_{nullptr};
 };
 
 /// Program select entity for Home Assistant.

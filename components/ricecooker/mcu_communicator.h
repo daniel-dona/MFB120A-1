@@ -54,15 +54,27 @@ class MCUCommunicator {
 
   void set_led_status(LED_ID led, LED_STATE state);
 
+  /// Light up a single mode LED (clears all others first).
+  void set_led_program_index(uint8_t idx);
+
   // --- Sensor getters ---
   uint8_t get_top_temperature() const { return top_temperature_; }
   uint8_t get_bottom_temperature() const { return bottom_temperature_; }
+  /// Get mains voltage in 0.1V AC units (e.g., 232 = 23.2V... no, 2320 = 232V)
+  /// Raw ADC byte ~196 at 232V AC, scale ~1.18 V/ADC
+  /// Returns voltage in tenths of V AC (e.g., 2320 = 232.0V)
+  uint16_t get_voltage_ac() const { 
+    return static_cast<uint16_t>(voltage_ * 118) / 10;
+  }
   uint8_t get_voltage() const { return voltage_; }
 
   // --- Button press callback type ---
   /// Callback receives the button command byte (0x81=TIMER, 0x82=CANCEL, 0x84=SELECT, 0x88=START).
-  using ButtonCallback = void(*)(uint8_t command);
-  void set_button_callback(ButtonCallback cb) { button_callback_ = cb; }
+  using ButtonCallback = void(*)(uint8_t command, void *arg);
+  void set_button_callback(ButtonCallback cb, void *arg) {
+    button_callback_ = cb;
+    button_callback_arg_ = arg;
+  }
 
  private:
   void send_data();
@@ -101,6 +113,7 @@ class MCUCommunicator {
 
   // Button callback
   ButtonCallback button_callback_{nullptr};
+  void *button_callback_arg_{nullptr};
 
   // LED status
   bool led1_{false}, led2_{false}, led3_{false}, led4_{false}, led5_{false};

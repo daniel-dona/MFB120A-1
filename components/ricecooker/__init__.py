@@ -19,7 +19,7 @@ from esphome.const import CONF_ID
 
 CODEOWNERS = ["@daniel-dona"]
 DEPENDENCIES = ["uart"]
-AUTO_LOAD = ["sensor", "switch", "select"]
+AUTO_LOAD = ["sensor", "select"]
 
 # ─── Top-level configuration ────────────────────────────────────────────────
 CONF_KEEP_WARM_TEMPERATURE = "keep_warm_temperature"

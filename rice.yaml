@@ -19,6 +19,7 @@ esp32:
       ignore_efuse_custom_mac: true
 
 logger:
+  level: INFO
 
 api:
   encryption:
@@ -353,20 +354,31 @@ sensor:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
     top_temperature:
-      name: "Temperatura superior"
+      name: "Tapa"
     bottom_temperature:
-      name: "Temperatura inferior"
+      name: "Base"
+    voltage:
+      name: "Tension"
+    remaining_time:
+      name: "Tiempo restante"
 
-switch:
-  - platform: ricecooker
-    ricecooker_id: ricecooker_1
-    power:
-      name: "Encendido"
+binary_sensor:
+  - platform: template
+    name: "Calentando"
+    device_class: heat
+    lambda: |-
+      return id(ricecooker_1).get_power();
 
 select:
   - platform: ricecooker
     ricecooker_id: ricecooker_1
-    name: "Modo"
+    name: "Programa"
+
+text_sensor:
+  - platform: template
+    name: "Estado"
+    lambda: |-
+      return std::string(id(ricecooker_1).get_program_name());
 
 button:
   - platform: template

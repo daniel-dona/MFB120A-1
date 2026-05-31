@@ -106,22 +106,20 @@ void MCUCommunicator::receive_data() {
       // Valid packet — extract data
       top_temperature_ = recv_buffer_[3];
       bottom_temperature_ = recv_buffer_[4];
-      // Byte [5] may contain voltage or status data from MCU
-      // We store it for diagnostics but don't rely on it yet
       voltage_ = recv_buffer_[5];
 
       uint8_t cmd = recv_buffer_[2];
-      if (cmd != 0) {
-        ESP_LOGD(TAG, "RX: cmd=0x%02X top=%d°C bot=%d°C v=%d",
-                 cmd, top_temperature_, bottom_temperature_, voltage_);
-        // Notify button presses
+      ESP_LOGV(TAG, "RX: %02X %02X %02X %02X %02X %02X %02X %02X %02X %02X | top=%d bot=%d v=%d",
+               recv_buffer_[0], recv_buffer_[1], recv_buffer_[2], recv_buffer_[3],
+               recv_buffer_[4], recv_buffer_[5], recv_buffer_[6], recv_buffer_[7],
+               recv_buffer_[8], recv_buffer_[9],
+               top_temperature_, bottom_temperature_, voltage_);
+
+      if (cmd != 0x80 && cmd != 0) {
         if (button_callback_ != nullptr) {
-          button_callback_(cmd);
+          button_callback_(cmd, button_callback_arg_);
         }
       }
-
-      ESP_LOGVV(TAG, "RX: top=%d bot=%d v=%d cmd=0x%02X",
-                top_temperature_, bottom_temperature_, voltage_, cmd);
 
       buf_idx = 0;  // Ready for next packet
     }
@@ -225,6 +223,30 @@ void MCUCommunicator::set_led_status(LED_ID led, LED_STATE state) {
     case LED_ID::LED8:         led8_ = on; break;
     case LED_ID::LED9_ORANGE:  led9_orange_ = on; break;
     case LED_ID::LED9_BLUE:    led9_blue_ = on; break;
+  }
+}
+
+void MCUCommunicator::set_led_program_index(uint8_t idx) {
+  // Clear all mode LEDs first
+  set_led_status(LED_ID::LED1, LED_STATE::OFF);
+  set_led_status(LED_ID::LED2, LED_STATE::OFF);
+  set_led_status(LED_ID::LED3, LED_STATE::OFF);
+  set_led_status(LED_ID::LED4, LED_STATE::OFF);
+  set_led_status(LED_ID::LED5, LED_STATE::OFF);
+  set_led_status(LED_ID::LED6, LED_STATE::OFF);
+  set_led_status(LED_ID::LED7, LED_STATE::OFF);
+  set_led_status(LED_ID::LED8, LED_STATE::OFF);
+  set_led_status(LED_ID::LED9_ORANGE, LED_STATE::OFF);
+
+  // Map index to LED: 0=KeepWarm, 1=Rice, 2=BrownRice, 3=Congee,
+  // 4=Soup, 5=Steam, 6=Reheat, 7=Custom, 8=Yogurt
+  static const LED_ID MAP[] = {
+    LED_ID::LED1, LED_ID::LED2, LED_ID::LED3, LED_ID::LED4,
+    LED_ID::LED5, LED_ID::LED6, LED_ID::LED7, LED_ID::LED8,
+    LED_ID::LED9_ORANGE
+  };
+  if (idx < sizeof(MAP) / sizeof(MAP[0])) {
+    set_led_status(MAP[idx], LED_STATE::ON);
   }
 }
 

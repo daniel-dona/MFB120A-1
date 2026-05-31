@@ -11,16 +11,54 @@ namespace esphome::ricecooker {
 void RiceCooker::setup() {
   mcu_communicator_.set_uart_device(this);
 
+  // Wire up physical button callbacks
+  mcu_communicator_.set_button_callback([](uint8_t cmd, void *arg) {
+    auto *rc = static_cast<RiceCooker *>(arg);
+    switch (cmd) {
+      case 0x88: // START
+        ESP_LOGI(TAG, "Physical button: START");
+        rc->start();
+        break;
+      case 0x82: // CANCEL
+        ESP_LOGI(TAG, "Physical button: CANCEL");
+        rc->cancel();
+        break;
+      case 0x84: // SELECT
+        ESP_LOGI(TAG, "Physical button: SELECT");
+        // Cycle to next program
+        {
+          auto names = rc->get_program_names();
+          const char *cur = rc->get_program_name();
+          int idx = -1;
+          for (size_t i = 0; i < names.size(); i++) {
+            if (strcmp(names[i], cur) == 0) { idx = (int)i; break; }
+          }
+          idx = (idx + 1) % (int)names.size();
+          rc->set_program_by_name(names[idx]);
+        }
+        break;
+      case 0x81: // TIMER
+        ESP_LOGI(TAG, "Physical button: TIMER (reservation not implemented)");
+        break;
+    }
+  }, this);
+
   // Append auto keep-warm stages to programs that have keep_warm_after=true
-  // and don't already end with an INFINITE_HOLD stage
   for (auto *prog : custom_programs_) {
     if (prog->keep_warm_after()) {
       prog->add_stage(keep_warm_temperature_, keep_warm_hysteresis_,
-                      0,  // duration_ms=0 (not timed)
-                      true,  // hold=true (infinite)
-                      0, 0,  // no thresholds
-                      255);  // auto power
+                      0, true, 0, 0, 255);
     }
+  }
+
+  // Force select options refresh (in case select setup ran before ours)
+  if (program_select_ != nullptr) {
+    auto names = get_program_names();
+    esphome::FixedVector<const char *> options;
+    for (const char *name : names) {
+      options.push_back(name);
+    }
+    program_select_->traits.set_options(options);
   }
 }
 
@@ -63,37 +101,54 @@ void RiceCooker::loop() {
     sensor_bottom_->publish_state(bottom_temp);
   }
   if (sensor_voltage_ != nullptr) {
-    sensor_voltage_->publish_state(voltage);
+    sensor_voltage_->publish_state(voltage * 1.1837f);
   }
 
   // Step the active program
   if (current_program_ != nullptr) {
     current_program_->step(&heater_);
 
+    // Publish remaining time in minutes
+    if (sensor_remaining_ != nullptr) {
+      auto remaining = current_program_->remaining_time_seconds();
+      if (remaining.has_value()) {
+        sensor_remaining_->publish_state(*remaining / 60);
+      } else {
+        sensor_remaining_->publish_state(NAN);
+      }
+    }
+
     if (current_program_->is_finished()) {
       ESP_LOGI(TAG, "Program '%s' finished", current_program_->get_name());
       heater_.power_off();
       heater_.reset();
       current_program_ = nullptr;
+      if (sensor_remaining_ != nullptr) {
+        sensor_remaining_->publish_state(0);
+      }
+    }
+  } else {
+    if (sensor_remaining_ != nullptr) {
+      sensor_remaining_->publish_state(NAN);
     }
   }
 
   // Update MCU display with remaining time or temperature
-  if (current_program_ != nullptr) {
+  if (current_program_ != nullptr && !current_program_->is_finished()) {
     auto remaining = current_program_->remaining_time_seconds();
     if (remaining.has_value()) {
       uint32_t total_min = *remaining / 60;
       hours_ = total_min / 60;
       minutes_ = total_min % 60;
     } else {
-      // Infinite hold (keep-warm) — display dashes or temperature
-      hours_ = 0;
-      minutes_ = 0;
+      // Infinite hold (keep-warm) — show dashes
+      hours_ = 99;
+      minutes_ = 99;
     }
   } else {
-    // No program — show current temperatures on display
-    hours_ = top_temp;
-    minutes_ = bottom_temp;
+    // No program — show plate temp on display (for diagnostics)
+    hours_ = bottom_temp;
+    minutes_ = top_temp;
   }
 
   mcu_communicator_.set_time(hours_, minutes_);
@@ -136,9 +191,6 @@ std::vector<const char *> RiceCooker::get_program_names() const {
 void RiceCooker::power_on() {
   heater_.power_on();
   mcu_communicator_.set_power(true);
-  if (power_switch_ != nullptr) {
-    power_switch_->publish_state(true);
-  }
 }
 
 void RiceCooker::power_off() {
@@ -146,9 +198,6 @@ void RiceCooker::power_off() {
   heater_.reset();
   mcu_communicator_.set_power(false);
   current_program_ = nullptr;
-  if (power_switch_ != nullptr) {
-    power_switch_->publish_state(false);
-  }
 }
 
 bool RiceCooker::get_power() { return heater_.get_power(); }
@@ -206,30 +255,23 @@ void RiceCooker::select_program(ProfileProgram *program) {
   if (program != nullptr) {
     ESP_LOGI(TAG, "Selected program: %s", program->get_name());
     program->start();
+
+    // Set mode LED
+    for (size_t i = 0; i < custom_programs_.size(); i++) {
+      if (custom_programs_[i] == program) {
+        mcu_communicator_.set_led_program_index(i);
+        break;
+      }
+    }
   } else {
     ESP_LOGI(TAG, "No program selected");
+    // Clear LEDs: set to out-of-range to turn all off
+    mcu_communicator_.set_led_program_index(255);
   }
 
   if (program_select_ != nullptr) {
     program_select_->publish_state(program ? program->get_name() : NONE_NAME);
   }
-}
-
-// ============================================================================
-// RiceCookerPowerSwitch
-// ============================================================================
-
-void RiceCookerPowerSwitch::write_state(bool state) {
-  if (state) {
-    ricecooker_->power_on();
-  } else {
-    ricecooker_->power_off();
-  }
-  this->publish_state(state);
-}
-
-void RiceCookerPowerSwitch::dump_config() {
-  ESP_LOGCONFIG(TAG, "Rice Cooker Power Switch");
 }
 
 // ============================================================================
