@@ -42,6 +42,9 @@ class MCUCommunicator {
 
   // --- Display control ---
   void set_time(uint8_t hours, uint8_t minutes);
+  /// Set 4 raw digit values (special codes: 0xFF=blank, 0xFE='P', 0xFD='n', 99='--')
+  void set_raw_digits(uint8_t d1, uint8_t d2, uint8_t d3, uint8_t d4);
+  void set_colon(bool on) { colon_ = on; }
   void set_power(bool power);
   void set_sleep(bool sleep);
 
@@ -101,10 +104,10 @@ class MCUCommunicator {
   uint32_t mcu_last_{0};
 
   // Display state
-  uint8_t hours_{0};
-  uint8_t minutes_{0};
+  uint8_t digits_[4]{};  // Raw digit values (0-9, or special codes: 0xFF=blank, 0xFE=P, 0xFD=n)
   bool power_{false};
   bool sleep_{false};
+  bool colon_{true};  ///< Show colon between digits 2-3 (HH:MM vs HH MM)
 
   // Sensor data from MCU
   uint8_t top_temperature_{0};

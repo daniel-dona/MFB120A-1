@@ -140,10 +140,10 @@ void MCUCommunicator::write_data() {
   }
 
   // 7-segment display [3-6]
-  send_buffer_[3] = int_7seg(hours_ / 10, false);
-  send_buffer_[4] = int_7seg(hours_ % 10, true);    // Dot
-  send_buffer_[5] = int_7seg(minutes_ / 10, true);   // Dot
-  send_buffer_[6] = int_7seg(minutes_ % 10, false);
+  send_buffer_[3] = int_7seg(digits_[0], false);
+  send_buffer_[4] = int_7seg(digits_[1], colon_);    // Colon left dot
+  send_buffer_[5] = int_7seg(digits_[2], colon_);   // Colon right dot
+  send_buffer_[6] = int_7seg(digits_[3], false);
 
   // LED bank 1 [7]: LED1-LED5
   send_buffer_[7] = 0b00000000;
@@ -195,7 +195,27 @@ uint8_t MCUCommunicator::int_7seg(uint8_t value, bool dot) {
       0b01111111,  // 8
       0b01101111,  // 9
   };
-  uint8_t byte = SEGMENT_TABLE[value % 10];
+
+  // Special display codes:
+  //   0xFF = blank (all segments off)
+  //   0xFE = 'P' (segments a, b, e, f, g)
+  //   0xFD = 'n' (segments c, e, g)
+  //   99   = '--' (dash on each digit via middle segment)
+
+  uint8_t byte;
+  if (value == 0xFF) {
+    byte = 0b00000000;  // Blank
+  } else if (value == 0xFE) {
+    byte = 0b01110011;  // P = a+b+f+g+e (but no c, no d)
+    // Segments: a=1, b=1, f=1, g=1, e=1 → 0b01110011
+  } else if (value == 0xFD) {
+    byte = 0b01010100;  // n = c+e+g
+  } else if (value >= 10) {
+    byte = 0b01000000;  // Dash (middle segment only) for any value >= 10 that's not special
+  } else {
+    byte = SEGMENT_TABLE[value % 10];
+  }
+
   if (dot) {
     byte |= 0b10000000;
   }
@@ -203,8 +223,17 @@ uint8_t MCUCommunicator::int_7seg(uint8_t value, bool dot) {
 }
 
 void MCUCommunicator::set_time(uint8_t hours, uint8_t minutes) {
-  hours_ = hours;
-  minutes_ = minutes;
+  digits_[0] = hours / 10;
+  digits_[1] = hours % 10;
+  digits_[2] = minutes / 10;
+  digits_[3] = minutes % 10;
+}
+
+void MCUCommunicator::set_raw_digits(uint8_t d1, uint8_t d2, uint8_t d3, uint8_t d4) {
+  digits_[0] = d1;
+  digits_[1] = d2;
+  digits_[2] = d3;
+  digits_[3] = d4;
 }
 
 void MCUCommunicator::set_power(bool power) { power_ = power; }

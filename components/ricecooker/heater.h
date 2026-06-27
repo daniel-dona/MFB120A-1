@@ -61,8 +61,8 @@ class Heater {
   void clear_emergency() { emergency_ = false; }
 
  private:
-  static constexpr uint32_t CYCLE_PERIOD_MS = 20000;  ///< 20-second power cycle
-  static constexpr uint8_t MAX_POWER = 28;
+  static constexpr uint32_t CYCLE_PERIOD_MS = 60000;  ///< 60-second cycle
+  static constexpr uint8_t MAX_POWER = 60;              ///< seconds per minute
 
   // Power state
   bool power_{false};
@@ -71,7 +71,7 @@ class Heater {
   // Bang-bang targets
   uint8_t max_target_{0};   ///< target + hysteresis (ON threshold)
   uint8_t min_target_{0};   ///< target - hysteresis (OFF threshold)
-  uint8_t power_level_{28}; ///< Current power level (0-28, 255=auto)
+  uint8_t power_level_{28}; ///< Power level: seconds of heater ON per minute (0-60)
 
   // Cycle timing
   uint32_t cycle_start_ms_{0};

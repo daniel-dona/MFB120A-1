@@ -22,6 +22,7 @@ CONF_TOP_TEMPERATURE = "top_temperature"
 CONF_BOTTOM_TEMPERATURE = "bottom_temperature"
 CONF_VOLTAGE = "voltage"
 CONF_REMAINING_TIME = "remaining_time"
+CONF_STAGE_REMAINING_TIME = "stage_remaining_time"
 
 CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_RICECOOKER_ID): cv.use_id(RiceCooker),
@@ -53,6 +54,13 @@ CONFIG_SCHEMA = cv.Schema({
         device_class=DEVICE_CLASS_DURATION,
         state_class=STATE_CLASS_MEASUREMENT,
     ),
+    cv.Optional(CONF_STAGE_REMAINING_TIME): sensor.sensor_schema(
+        unit_of_measurement=UNIT_MINUTE,
+        icon=ICON_TIMER,
+        accuracy_decimals=0,
+        device_class=DEVICE_CLASS_DURATION,
+        state_class=STATE_CLASS_MEASUREMENT,
+    ),
 })
 
 
@@ -74,3 +82,7 @@ async def to_code(config):
     if remaining_config := config.get(CONF_REMAINING_TIME):
         sens = await sensor.new_sensor(remaining_config)
         cg.add(paren.set_sensor_remaining(sens))
+
+    if stage_remaining_config := config.get(CONF_STAGE_REMAINING_TIME):
+        sens = await sensor.new_sensor(stage_remaining_config)
+        cg.add(paren.set_sensor_stage_remaining(sens))

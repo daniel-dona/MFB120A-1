@@ -50,10 +50,10 @@ uint32_t Heater::get_on_time_ms() const {
     return 0;
   }
   if (power_level_ >= MAX_POWER) {
-    return cycle_period_;  // 100% duty cycle
+    return cycle_period_;  // 100% duty
   }
-  // Linear mapping: power 1-27 maps to 1/28 to 27/28 of cycle
-  return (static_cast<uint32_t>(power_level_) * cycle_period_) / MAX_POWER;
+  // power = seconds of heater ON per minute
+  return static_cast<uint32_t>(power_level_) * 1000;
 }
 
 void Heater::step(uint32_t now_ms) {

@@ -22,7 +22,8 @@ async def to_code(config):
 
     import sys
     from . import _program_names
-    options = _program_names if _program_names else ["None"]
+    # Select options: program names only
+    options = _program_names if _program_names else []
 
     sel = cg.new_Pvariable(config["id"])
     await select.register_select(sel, config, options=options)

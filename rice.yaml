@@ -1,6 +1,9 @@
 esphome:
   name: rice-cooker
 
+substitutions:
+  name: rice-cooker
+
 external_components:
   source:
     type: local
@@ -20,6 +23,12 @@ esp32:
 
 logger:
   level: INFO
+  hardware_uart: UART0
+  baud_rate: 0
+  logs:
+    ricecooker_program: INFO
+    ricecooker: INFO
+    ricecooker_heater: INFO
 
 api:
   encryption:
@@ -32,6 +41,7 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  power_save_mode: none
   ap:
     ssid: ${name}
     password: !secret wifi_password
@@ -56,295 +66,336 @@ uart:
 # Stage types:
 #   - transitional: advance when bottom temp reaches target (no duration/hold)
 #   - timed hold:    maintain temp for duration, then advance
-#   - infinite hold: maintain temp until cancelled (hold: true)
+#   - infinite hold: maintain temp until cancelled (type: keep)
+#   - ramp:          interpolate from→to over duration
+#
+# Keep warm is explicit: define a program with a 'keep' stage and chain to it
+# via 'next: "Mantener Caliente"' on any program that should maintain temp after.
+#
+# State machine:
+#   - Idle:     no program selected, ready to start
+#   - Running:  a program is actively running
+#   - Finished: a program completed naturally (no next), stays until user acts
 #
 # Safety (always active, built-in):
-#   - Emergency shutoff if plate > 120°C
-#   - Emergency shutoff if lid > 84°C during hold
-#
-# Per-stage options:
-#   target_temperature: °C setpoint for bang-bang control (required)
-#   hysteresis:         ±°C tolerance band (default: 3)
-#   duration:           hold time (mutually exclusive with hold)
-#   hold: true          infinite hold until cancelled
-#   top_threshold:      °C, advance if lid reaches this (default: 0=disabled)
-#   bottom_threshold:   °C, advance if plate reaches this (default: 0=disabled)
-#   power:              heater power level 0-28 (default: 255=auto)
+#   - Emergency shutoff if plate > 130°C (any mode)
+#   - Emergency shutoff if plate > 104°C during hold/keep
+#   - Emergency shutoff if lid > 84°C during hold/keep
 # ============================================================================
 
 ricecooker:
   id: ricecooker_1
   uart_id: uart_bus
-  keep_warm_temperature: 75    # °C, used by auto keep-warm
-  keep_warm_hysteresis: 4      # ±°C, used by auto keep-warm
+  can_start_sensor: can_start
+  can_cancel_sensor: can_cancel
+  state_sensor: state_sensor
+  # can_select_sensor: can_select  TODO: add to codegen if needed
 
   programs:
-    # ─── Mantener Caliente (Keep Warm) ─────────────────────
-    # Infinite hold at 75°C. Matches firmware how=0x0C bang-bang algorithm.
+    # ─── Mantener Caliente ─────────────────────────────────
     - name: "Mantener Caliente"
-      keep_warm_after: false    # Already a hold stage, don't append another
+      description: "Mantiene la comida a temperatura de servicio"
       stages:
-        - target_temperature: 75
+        - type: keep
+          to: 40
           hysteresis: 4
-          hold: true
-          power: 6
+          power: 20
 
-    # ─── Arroz (White Rice) ─────────────────────────────────
-    # 60-min cycle matching original firmware how=2.
-    # Phase 0 (warmup) → Phase 1 (early soak) → Phase 2 (main soak) →
-    # Phase 3 (pre-boil sub-phases 73→82→84°C) → Phase 4-5 (steam) →
-    # Phase 6-7 (steam cycle) → auto keep-warm at 75°C
+    # ─── Arroz ──────────────────────────────────────────────
     - name: "Arroz"
-      keep_warm_after: true
+      description: "Arroz blanco, 2 tazas de agua por 1 de arroz"
+      next: "Mantener Caliente"
       stages:
-        # P0: Warmup check (32s, heater off)
-        - target_temperature: 25
+        - type: hold
+          to: 25
           hysteresis: 3
           duration: 32s
-          power: 0
-
-        # P1: Early soak (3min, heat to 45°C, full power)
-        - target_temperature: 45
+          power: off
+        - type: hold
+          to: 45
           hysteresis: 2
           duration: 180s
-          power: 28
-
-        # P2: Main soak (40min, heat to 60°C, full power)
-        # Firmware advances at 40min OR plate≥130°C (safety)
-        - target_temperature: 60
+          power: max
+        - type: hold
+          to: 60
           hysteresis: 3
           duration: 2400s
           bottom_threshold: 130
-          power: 28
-
-        # P3 sub0: Pre-boil heat to 73°C
-        - target_temperature: 100
+          power: max
+        - type: heat
+          to: 100
           hysteresis: 2
           bottom_threshold: 73
-          power: 8
-
-        # P3 sub1: Pre-boil heat to 82°C
-        - target_temperature: 100
+          power: medium
+        - type: heat
+          to: 100
           hysteresis: 2
           bottom_threshold: 82
-          power: 12
-
-        # P3 sub2: Pre-boil heat to 84°C
-        - target_temperature: 100
+          power: high
+        - type: heat
+          to: 100
           hysteresis: 2
           bottom_threshold: 84
-          power: 14
-
-        # P3 sub3: Boil phase (full power until water absorbed)
-        - target_temperature: 135
+          power: high
+        - type: heat
+          to: 135
           hysteresis: 3
           bottom_threshold: 130
-          power: 15
-
-        # P5: Transition / steam
-        - target_temperature: 120
+          power: high
+        - type: hold
+          to: 120
           hysteresis: 5
           duration: 300s
-          power: 8
-
-        # P6-P7: Steam cycle (30min)
-        - target_temperature: 125
+          power: medium
+        - type: hold
+          to: 125
           hysteresis: 5
           duration: 1800s
           bottom_threshold: 130
-          power: 10
-
-        # P8: Cool-down (brief)
-        - target_temperature: 105
+          power: medium
+        - type: hold
+          to: 105
           hysteresis: 5
           duration: 120s
-          power: 4
+          power: low
 
-    # ─── Arroz Integral (Brown Rice) ────────────────────────
-    # 105-min cycle matching original firmware how=3.
+    # ─── Arroz Integral ────────────────────────────────────
     - name: "Arroz Integral"
-      keep_warm_after: true
+      next: "Mantener Caliente"
       stages:
-        # P0: Warmup (32s)
-        - target_temperature: 25
+        - type: hold
+          to: 25
           hysteresis: 3
           duration: 32s
-          power: 0
-
-        # P3: Long soak (30min, heat slowly)
-        - target_temperature: 60
+          power: off
+        - type: hold
+          to: 60
           hysteresis: 5
           duration: 1800s
           bottom_threshold: 130
-          power: 28
-
-        # P3 sub0: Brown rice pre-heat to 73°C
-        - target_temperature: 100
+          power: max
+        - type: heat
+          to: 100
           hysteresis: 3
           bottom_threshold: 73
-          power: 8
-
-        # P3 sub1: Brown rice pre-heat to 75°C
-        - target_temperature: 100
+          power: medium
+        - type: heat
+          to: 100
           hysteresis: 3
           bottom_threshold: 75
-          power: 8
-
-        # P3 sub2: Brown rice pre-heat to 80°C
-        - target_temperature: 100
+          power: medium
+        - type: heat
+          to: 100
           hysteresis: 3
           bottom_threshold: 80
-          power: 10
-
-        # P3 sub3: Boil phase (until water absorbed)
-        - target_temperature: 128
+          power: medium
+        - type: heat
+          to: 128
           hysteresis: 3
           bottom_threshold: 130
-          power: 15
-
-        # P7: Simmer (30min)
-        - target_temperature: 128
+          power: high
+        - type: hold
+          to: 128
           hysteresis: 5
           duration: 1800s
-          power: 6
-
-        # P8: Rest (15min)
-        - target_temperature: 125
+          power: low
+        - type: hold
+          to: 125
           hysteresis: 5
           duration: 900s
-          power: 4
+          power: low
 
-    # ─── Arroz Rápido (Quick Rice) ─────────────────────────
-    # Shorter cycle for quick white rice (~30min)
+    # ─── Arroz Rapido ──────────────────────────────────────
     - name: "Arroz Rapido"
-      keep_warm_after: true
+      next: "Mantener Caliente"
       stages:
-        # Heat to soak temp
-        - target_temperature: 60
+        - type: heat
+          to: 60
           hysteresis: 2
-
-        # Brief soak
-        - target_temperature: 60
+          power: max
+        - type: hold
+          to: 60
           hysteresis: 5
           duration: 300s
-
-        # Quick heat to boil
-        - target_temperature: 100
+          power: high
+        - type: heat
+          to: 100
           hysteresis: 2
           bottom_threshold: 84
-
-        # Cook at boil
-        - target_temperature: 100
+          power: max
+        - type: hold
+          to: 100
           hysteresis: 2
           duration: 600s
-
-        # Steam rest
-        - target_temperature: 105
+          power: medium
+        - type: hold
+          to: 105
           hysteresis: 5
           duration: 300s
+          power: low
 
-    # ─── Cebolla Caramelizada (Caramelized Onions) ──────────
-    # Low and slow: sweat → caramelize → finish
+    # ─── Cebolla Caramelizada ───────────────────────────────
     - name: "Cebolla Caramelizada"
-      keep_warm_after: true
+      description: "Cebolla caramelizada con pausas para remover"
       stages:
-        # Sweat the onions (low temp until soft)
-        - target_temperature: 80
+        - type: heat
+          to: 120
           hysteresis: 3
-          bottom_threshold: 85
-
-        # Caramelize slowly (40min medium-low)
-        - target_temperature: 88
+          power: high
+        - type: hold
+          to: 110
           hysteresis: 3
-          duration: 40min
+          duration: 60min
+          power: high
+        - type: action
+          description: "Remueve la cebolla"
+          to: 110
+          hysteresis: 5
+          power: off
+        - type: hold
+          to: 110
+          hysteresis: 3
+          duration: 60min
+          power: medium
+        - type: action
+          description: "Remueve la cebolla"
+          to: 110
+          hysteresis: 5
+          power: off
+        - type: hold
+          to: 110
+          hysteresis: 3
+          duration: 60min
+          power: low
 
-        # Deep flavor development
-        - target_temperature: 75
-          hysteresis: 2
-          duration: 15min
-
-    # ─── Cocción Lenta (Slow Cook) ──────────────────────────
-    # Generic slow cooker, 2h at ~90°C
-    - name: "Coccion Lenta"
-      keep_warm_after: true
+    # ─── Reducción ──────────────────────────────────────
+    - name: "Reducir 4h"
+      next: "Mantener Caliente"
       stages:
-        - target_temperature: 90
-          hysteresis: 3
+        - type: hold
+          to: 105
+          hysteresis: 5
+          duration: 240min
+          power: high
+
+    - name: "Reducir 2h"
+      next: "Mantener Caliente"
+      stages:
+        - type: hold
+          to: 105
+          hysteresis: 5
           duration: 120min
+          power: high
 
-    # ─── Yogur (Yogurt) ─────────────────────────────────────
-    # Gentle fermentation at 43°C for 8h, no keep-warm after
-    - name: "Yogur"
-      keep_warm_after: false
+    - name: "Reducir 1h"
+      next: "Mantener Caliente"
       stages:
-        - target_temperature: 43
+        - type: hold
+          to: 105
+          hysteresis: 5
+          duration: 120min
+          power: high
+
+    # ─── Yogur ──────────────────────────────────────────────
+    - name: "Yogur"
+      stages:
+        - type: hold
+          to: 43
           hysteresis: 2
           duration: 8h
+          power: gentle
 
-    # ─── Recalentar (Reheat) ────────────────────────────────
-    # Reheat previously cooked food to serving temperature (~75°C)
+    # ─── Recalentar ─────────────────────────────────────────
     - name: "Recalentar"
-      keep_warm_after: true
+      next: "Mantener Caliente"
       stages:
-        - target_temperature: 75
+        - type: hold
+          to: 75
           hysteresis: 4
           duration: 15min
-          power: 8
+          power: medium
 
-    # ─── Al Vapor (Steam) ──────────────────────────────────
-    # Steam cooking, ~30min at high temp
+    # ─── Al Vapor ──────────────────────────────────────────
     - name: "Al Vapor"
-      keep_warm_after: true
+      next: "Mantener Caliente"
       stages:
-        # Heat to steam temp quickly
-        - target_temperature: 100
+        - type: heat
+          to: 100
           hysteresis: 3
           bottom_threshold: 89
-          power: 28
-
-        # Steam cycle (30min)
-        - target_temperature: 100
+          power: max
+        - type: hold
+          to: 100
           hysteresis: 2
           duration: 30min
-          power: 17
-
-        # Brief rest
-        - target_temperature: 85
+          power: high
+        - type: hold
+          to: 85
           hysteresis: 5
           duration: 5min
-          power: 4
+          power: low
 
-    # ─── Congee (Porridge) ──────────────────────────────────
-    # Long slow cook for rice porridge, ~90min
+    # ─── Congee ────────────────────────────────────────────
     - name: "Congee"
-      keep_warm_after: true
+      next: "Mantener Caliente"
       stages:
-        # Heat to soak temp
-        - target_temperature: 60
+        - type: hold
+          to: 60
           hysteresis: 5
           duration: 300s
           bottom_threshold: 130
-          power: 28
-
-        # Extended soak / warm-up
-        - target_temperature: 80
+          power: max
+        - type: hold
+          to: 80
           hysteresis: 3
           duration: 1800s
           bottom_threshold: 87
-          power: 24
-
-        # Slow cook at near-boil
-        - target_temperature: 100
+          power: high
+        - type: hold
+          to: 100
           hysteresis: 3
           duration: 3600s
           bottom_threshold: 130
-          power: 12
-
-        # Simmer down
-        - target_temperature: 90
+          power: high
+        - type: hold
+          to: 90
           hysteresis: 3
           duration: 900s
-          power: 5
+          power: gentle
+
+    # ─── Demo ────────────────────────────────────────────
+    - name: "Test Completo"
+      description: "Prueba heat, hold, ramp. Encadena con Mantener Caliente"
+      next: "Mantener Caliente"
+      stages:
+        - type: heat          # TRANSITIONAL: avanza al alcanzar temp
+          to: 40
+          hysteresis: 3
+          power: medium
+        - type: hold          # TIMED_HOLD: mantiene temp por tiempo fijo
+          to: 40
+          hysteresis: 3
+          duration: 300s
+          power: medium
+        - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+          from: 40
+          to: 50
+          hysteresis: 3
+          duration: 600s
+          curve: linear
+          power: medium
+        - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+          from: 50
+          to: 40
+          hysteresis: 3
+          duration: 600s
+          curve: linear
+          power: medium
+        - type: hold          # TIMED_HOLD: mantiene 80°C por 30s
+          to: 40
+          hysteresis: 3
+          duration: 300s
+          power: low
 
 # ============================================================================
 # Entities
@@ -355,12 +406,43 @@ sensor:
     ricecooker_id: ricecooker_1
     top_temperature:
       name: "Tapa"
+      filters:
+        - throttle: 2s
     bottom_temperature:
       name: "Base"
+      filters:
+        - throttle: 2s
     voltage:
       name: "Tension"
+      filters:
+        - throttle: 60s
     remaining_time:
-      name: "Tiempo restante"
+      name: "Tiempo total restante"
+      filters:
+        - throttle: 5s
+    stage_remaining_time:
+      name: "Tiempo fase restante"
+      filters:
+        - throttle: 5s
+  - platform: template
+    name: "Fase actual"
+    id: stage_index
+    update_interval: 2s
+    lambda: |-
+      return id(ricecooker_1).current_stage_index();
+  - platform: template
+    name: "Total fases"
+    id: total_stages
+    update_interval: 2s
+    lambda: |-
+      return id(ricecooker_1).total_stages();
+  - platform: template
+    name: "Objetivo fase"
+    id: stage_target
+    unit_of_measurement: "°C"
+    update_interval: 2s
+    lambda: |-
+      return id(ricecooker_1).current_stage_target();
 
 binary_sensor:
   - platform: template
@@ -368,6 +450,30 @@ binary_sensor:
     device_class: heat
     lambda: |-
       return id(ricecooker_1).get_power();
+
+  - platform: template
+    name: "Puede Iniciar"
+    id: can_start
+    lambda: |-
+      return id(ricecooker_1).can_start();
+
+  - platform: template
+    name: "Puede Cancelar"
+    id: can_cancel
+    lambda: |-
+      return id(ricecooker_1).can_cancel();
+
+  - platform: template
+    name: "Puede Confirmar"
+    id: can_confirm
+    lambda: |-
+      return id(ricecooker_1).can_confirm();
+
+  - platform: template
+    name: "Puede Seleccionar"
+    id: can_select
+    lambda: |-
+      return id(ricecooker_1).can_select_program();
 
 select:
   - platform: ricecooker
@@ -377,8 +483,28 @@ select:
 text_sensor:
   - platform: template
     name: "Estado"
+    id: state_sensor
+    update_interval: 2s
     lambda: |-
-      return std::string(id(ricecooker_1).get_program_name());
+      return std::string(id(ricecooker_1).get_state_name());
+  - platform: template
+    name: "Fase"
+    id: stage_type
+    update_interval: 2s
+    lambda: |-
+      return std::string(id(ricecooker_1).current_stage_type_name());
+  - platform: template
+    name: "Descripcion fase"
+    id: stage_desc
+    update_interval: 2s
+    lambda: |-
+      return std::string(id(ricecooker_1).current_stage_description());
+  - platform: template
+    name: "Descripcion programa"
+    id: program_desc
+    update_interval: 2s
+    lambda: |-
+      return std::string(id(ricecooker_1).current_program_description());
 
 button:
   - platform: template
@@ -392,3 +518,9 @@ button:
     on_press:
       - lambda:
           id(ricecooker_1).cancel();
+
+  - platform: template
+    name: "Confirmar"
+    on_press:
+      - lambda:
+          id(ricecooker_1).confirm();
