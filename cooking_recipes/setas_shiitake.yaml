@@ -1,0 +1,13 @@
+# ─── Setas Shiitake ─────────────────────────────────
+- name: "Setas Shiitake Confitadas"
+  description: "Setas a baja temperatura con sésamo y jengibre"
+  stages:
+    - type: heat
+      to: 65
+      hysteresis: 2
+      power: medium
+    - type: hold
+      to: 65
+      hysteresis: 2
+      duration: 45min
+      power: low

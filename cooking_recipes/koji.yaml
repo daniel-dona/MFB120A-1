@@ -1,0 +1,9 @@
+# ─── Koji ───────────────────────────────────────────
+- name: "Koji"
+  description: "Fermentación de Aspergillus oryzae sobre arroz/soja"
+  stages:
+    - type: hold
+      to: 30
+      hysteresis: 2
+      duration: 48h
+      power: gentle

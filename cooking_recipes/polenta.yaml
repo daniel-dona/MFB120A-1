@@ -1,0 +1,13 @@
+# ─── Polenta Cremosa ────────────────────────────────
+- name: "Polenta Cremosa"
+  description: "Harina de maíz nixtamalizada, sin grumos"
+  stages:
+    - type: heat
+      to: 90
+      hysteresis: 3
+      power: high
+    - type: hold
+      to: 90
+      hysteresis: 3
+      duration: 45min
+      power: medium

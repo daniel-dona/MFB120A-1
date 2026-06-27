@@ -1,0 +1,9 @@
+# ─── Yogur de Coco ──────────────────────────────────
+- name: "Yogur de Coco"
+  description: "Leche de coco + cultivo, luego colar 4h"
+  stages:
+    - type: hold
+      to: 43
+      hysteresis: 2
+      duration: 8h
+      power: gentle

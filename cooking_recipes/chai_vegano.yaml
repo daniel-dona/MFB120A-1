@@ -1,0 +1,13 @@
+# ─── Chai Vegano ────────────────────────────────────
+- name: "Chai Vegano"
+  description: "Leche vegetal + especias, sin hervir"
+  stages:
+    - type: heat
+      to: 85
+      hysteresis: 2
+      power: medium
+    - type: hold
+      to: 85
+      hysteresis: 2
+      duration: 20min
+      power: low

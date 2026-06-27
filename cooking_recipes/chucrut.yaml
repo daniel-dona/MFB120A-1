@@ -1,0 +1,9 @@
+# ─── Chucrut ────────────────────────────────────────
+- name: "Chucrut"
+  description: "Col fermentada con sal 2%, bote con válvula"
+  stages:
+    - type: hold
+      to: 22
+      hysteresis: 2
+      duration: 96h
+      power: off

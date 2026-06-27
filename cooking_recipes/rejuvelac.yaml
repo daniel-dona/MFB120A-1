@@ -1,0 +1,9 @@
+# ─── Rejuvelac ──────────────────────────────────────
+- name: "Rejuvelac"
+  description: "Agua de cultivo de germinados de quinua"
+  stages:
+    - type: hold
+      to: 22
+      hysteresis: 2
+      duration: 48h
+      power: off

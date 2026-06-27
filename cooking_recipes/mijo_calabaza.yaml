@@ -1,0 +1,13 @@
+# ─── Mijo con Calabaza ──────────────────────────────
+- name: "Mijo con Calabaza"
+  description: "Mijo cremoso con calabaza y caldo vegetal"
+  stages:
+    - type: heat
+      to: 90
+      hysteresis: 3
+      power: medium
+    - type: hold
+      to: 90
+      hysteresis: 3
+      duration: 30min
+      power: low

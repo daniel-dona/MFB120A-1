@@ -1,0 +1,13 @@
+# ─── Pudín de Tapioca ───────────────────────────────
+- name: "Pudín de Tapioca"
+  description: "Perlas de tapioca con leche vegetal"
+  stages:
+    - type: heat
+      to: 95
+      hysteresis: 2
+      power: medium
+    - type: hold
+      to: 95
+      hysteresis: 2
+      duration: 30min
+      power: low

@@ -1,0 +1,9 @@
+# ─── Sourdough Starter ──────────────────────────────
+- name: "Sourdough Starter"
+  description: "Refresco 1:1:1 de masa madre"
+  stages:
+    - type: hold
+      to: 27
+      hysteresis: 2
+      duration: 12h
+      power: off

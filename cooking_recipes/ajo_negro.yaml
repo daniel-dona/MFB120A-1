@@ -1,0 +1,9 @@
+# ─── Ajo Negro ──────────────────────────────────────
+- name: "Ajo Negro"
+  description: "Fermentación lenta a 60°C, 2-4 semanas en bote estanco"
+  stages:
+    - type: hold
+      to: 60
+      hysteresis: 2
+      duration: 336h
+      power: gentle

@@ -1,0 +1,9 @@
+# ─── Tempeh ─────────────────────────────────────────
+- name: "Tempeh"
+  description: "Soja fermentada con esporas de Rhizopus oligosporus"
+  stages:
+    - type: hold
+      to: 32
+      hysteresis: 2
+      duration: 30h
+      power: gentle

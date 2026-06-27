@@ -1,0 +1,13 @@
+# ─── Garbanzos para Hummus ──────────────────────────
+- name: "Garbanzos para Hummus"
+  description: "Con bicarbonato para textura ultra cremosa"
+  stages:
+    - type: heat
+      to: 90
+      hysteresis: 2
+      power: high
+    - type: hold
+      to: 90
+      hysteresis: 2
+      duration: 180min
+      power: medium

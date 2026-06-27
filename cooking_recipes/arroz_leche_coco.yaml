@@ -1,0 +1,18 @@
+# ─── Arroz con Leche de Coco ────────────────────────
+- name: "Arroz con Leche de Coco"
+  description: "Arroz bomba con leche de coco y cardamomo"
+  stages:
+    - type: heat
+      to: 90
+      hysteresis: 2
+      power: high
+    - type: hold
+      to: 90
+      hysteresis: 2
+      duration: 45min
+      power: medium
+    - type: hold
+      to: 75
+      hysteresis: 3
+      duration: 15min
+      power: low

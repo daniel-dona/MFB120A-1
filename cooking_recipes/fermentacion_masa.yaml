@@ -1,0 +1,9 @@
+# ─── Fermentación de Masa ───────────────────────────
+- name: "Fermentación de Masa"
+  description: "Levadura seca + harina fuerza, primer levado"
+  stages:
+    - type: hold
+      to: 28
+      hysteresis: 2
+      duration: 4h
+      power: off

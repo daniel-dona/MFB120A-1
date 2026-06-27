@@ -1,0 +1,13 @@
+# ─── Frijoles Negros ────────────────────────────────
+- name: "Frijoles Negros"
+  description: "Frijoles enteros con epazote, sin deshacer"
+  stages:
+    - type: heat
+      to: 95
+      hysteresis: 2
+      power: high
+    - type: hold
+      to: 95
+      hysteresis: 2
+      duration: 240min
+      power: medium

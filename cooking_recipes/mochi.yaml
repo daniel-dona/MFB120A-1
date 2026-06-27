@@ -1,0 +1,13 @@
+# ─── Mochi Dulce ────────────────────────────────────
+- name: "Mochi Dulce"
+  description: "Arroz glutinoso al vapor, luego amasado"
+  stages:
+    - type: heat
+      to: 100
+      hysteresis: 2
+      power: high
+    - type: hold
+      to: 100
+      hysteresis: 2
+      duration: 30min
+      power: medium
