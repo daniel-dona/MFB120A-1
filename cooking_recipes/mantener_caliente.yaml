@@ -1,4 +1,4 @@
-# programs.d/mantener_caliente.yaml
+# ─── Mantener Caliente ─────────────────────────────────
 - name: "Mantener Caliente"
   description: "Mantiene la comida a temperatura de servicio"
   stages:

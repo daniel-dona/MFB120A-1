@@ -1,0 +1,33 @@
+# ─── Cebolla Caramelizada ────────────────────────────────
+- name: "Cebolla Caramelizada"
+  description: "Cebolla caramelizada con pausas para remover"
+  stages:
+    - type: heat
+      to: 120
+      hysteresis: 3
+      power: high
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: high
+    - type: action
+      description: "Remueve la cebolla"
+      to: 110
+      hysteresis: 5
+      power: off
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: medium
+    - type: action
+      description: "Remueve la cebolla"
+      to: 110
+      hysteresis: 5
+      power: off
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: low

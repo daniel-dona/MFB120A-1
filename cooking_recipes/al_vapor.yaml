@@ -1,0 +1,19 @@
+# ─── Al Vapor ──────────────────────────────────────────
+- name: "Al Vapor"
+  next: "Mantener Caliente"
+  stages:
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 89
+      power: max
+    - type: hold
+      to: 100
+      hysteresis: 2
+      duration: 30min
+      power: high
+    - type: hold
+      to: 85
+      hysteresis: 5
+      duration: 5min
+      power: low

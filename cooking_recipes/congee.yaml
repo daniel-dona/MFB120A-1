@@ -1,0 +1,27 @@
+# ─── Congee ────────────────────────────────────────────
+- name: "Congee"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 60
+      hysteresis: 5
+      duration: 300s
+      bottom_threshold: 130
+      power: max
+    - type: hold
+      to: 80
+      hysteresis: 3
+      duration: 1800s
+      bottom_threshold: 87
+      power: high
+    - type: hold
+      to: 100
+      hysteresis: 3
+      duration: 3600s
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 90
+      hysteresis: 3
+      duration: 900s
+      power: gentle

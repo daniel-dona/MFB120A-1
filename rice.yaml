@@ -91,7 +91,7 @@ ricecooker:
   state_sensor: state_sensor
   # can_select_sensor: can_select  TODO: add to codegen if needed
 
-  programs: !include cooking_recipes.yaml
+  programs: !include_dir_merge_list cooking_recipes
 
 # ============================================================================
 # Entities

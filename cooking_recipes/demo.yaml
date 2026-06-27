@@ -1,0 +1,33 @@
+# ─── Demo ────────────────────────────────────────────
+- name: "Test Completo"
+  description: "Prueba heat, hold, ramp. Encadena con Mantener Caliente"
+  next: "Mantener Caliente"
+  stages:
+    - type: heat          # TRANSITIONAL: avanza al alcanzar temp
+      to: 40
+      hysteresis: 3
+      power: medium
+    - type: hold          # TIMED_HOLD: mantiene temp por tiempo fijo
+      to: 40
+      hysteresis: 3
+      duration: 300s
+      power: medium
+    - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+      from: 40
+      to: 50
+      hysteresis: 3
+      duration: 600s
+      curve: linear
+      power: medium
+    - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+      from: 50
+      to: 40
+      hysteresis: 3
+      duration: 600s
+      curve: linear
+      power: medium
+    - type: hold          # TIMED_HOLD: mantiene 80°C por 30s
+      to: 40
+      hysteresis: 3
+      duration: 300s
+      power: low

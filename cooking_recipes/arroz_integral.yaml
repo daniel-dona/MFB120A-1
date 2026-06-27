@@ -1,0 +1,45 @@
+# ─── Arroz Integral ────────────────────────────────────
+- name: "Arroz Integral"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 25
+      hysteresis: 3
+      duration: 32s
+      power: off
+    - type: hold
+      to: 60
+      hysteresis: 5
+      duration: 1800s
+      bottom_threshold: 130
+      power: max
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 73
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 75
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 80
+      power: medium
+    - type: heat
+      to: 128
+      hysteresis: 3
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 128
+      hysteresis: 5
+      duration: 1800s
+      power: low
+    - type: hold
+      to: 125
+      hysteresis: 5
+      duration: 900s
+      power: low

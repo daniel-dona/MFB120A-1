@@ -1,0 +1,27 @@
+# ─── Reducción ──────────────────────────────────────
+- name: "Reducir 4h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 240min
+      power: high
+
+- name: "Reducir 2h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120min
+      power: high
+
+- name: "Reducir 1h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120min
+      power: high

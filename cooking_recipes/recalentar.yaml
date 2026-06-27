@@ -1,0 +1,9 @@
+# ─── Recalentar ─────────────────────────────────────────
+- name: "Recalentar"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 75
+      hysteresis: 4
+      duration: 15min
+      power: medium

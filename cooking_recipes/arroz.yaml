@@ -1,0 +1,57 @@
+# ─── Arroz ──────────────────────────────────────────────
+- name: "Arroz"
+  description: "Arroz blanco, 2 tazas de agua por 1 de arroz"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 25
+      hysteresis: 3
+      duration: 32s
+      power: off
+    - type: hold
+      to: 45
+      hysteresis: 2
+      duration: 180s
+      power: max
+    - type: hold
+      to: 60
+      hysteresis: 3
+      duration: 2400s
+      bottom_threshold: 130
+      power: max
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 73
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 82
+      power: high
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 84
+      power: high
+    - type: heat
+      to: 135
+      hysteresis: 3
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 120
+      hysteresis: 5
+      duration: 300s
+      power: medium
+    - type: hold
+      to: 125
+      hysteresis: 5
+      duration: 1800s
+      bottom_threshold: 130
+      power: medium
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120s
+      power: low
