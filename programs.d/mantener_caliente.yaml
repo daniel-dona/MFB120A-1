@@ -1,0 +1,8 @@
+# programs.d/mantener_caliente.yaml
+- name: "Mantener Caliente"
+  description: "Mantiene la comida a temperatura de servicio"
+  stages:
+    - type: keep
+      to: 40
+      hysteresis: 4
+      power: 20

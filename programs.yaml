@@ -1,0 +1,304 @@
+# ─── Mantener Caliente ─────────────────────────────────
+- name: "Mantener Caliente"
+  description: "Mantiene la comida a temperatura de servicio"
+  stages:
+    - type: keep
+      to: 40
+      hysteresis: 4
+      power: 20
+
+# ─── Arroz ──────────────────────────────────────────────
+- name: "Arroz"
+  description: "Arroz blanco, 2 tazas de agua por 1 de arroz"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 25
+      hysteresis: 3
+      duration: 32s
+      power: off
+    - type: hold
+      to: 45
+      hysteresis: 2
+      duration: 180s
+      power: max
+    - type: hold
+      to: 60
+      hysteresis: 3
+      duration: 2400s
+      bottom_threshold: 130
+      power: max
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 73
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 82
+      power: high
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 84
+      power: high
+    - type: heat
+      to: 135
+      hysteresis: 3
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 120
+      hysteresis: 5
+      duration: 300s
+      power: medium
+    - type: hold
+      to: 125
+      hysteresis: 5
+      duration: 1800s
+      bottom_threshold: 130
+      power: medium
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120s
+      power: low
+
+# ─── Arroz Integral ────────────────────────────────────
+- name: "Arroz Integral"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 25
+      hysteresis: 3
+      duration: 32s
+      power: off
+    - type: hold
+      to: 60
+      hysteresis: 5
+      duration: 1800s
+      bottom_threshold: 130
+      power: max
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 73
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 75
+      power: medium
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 80
+      power: medium
+    - type: heat
+      to: 128
+      hysteresis: 3
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 128
+      hysteresis: 5
+      duration: 1800s
+      power: low
+    - type: hold
+      to: 125
+      hysteresis: 5
+      duration: 900s
+      power: low
+
+# ─── Arroz Rapido ──────────────────────────────────────
+- name: "Arroz Rapido"
+  next: "Mantener Caliente"
+  stages:
+    - type: heat
+      to: 60
+      hysteresis: 2
+      power: max
+    - type: hold
+      to: 60
+      hysteresis: 5
+      duration: 300s
+      power: high
+    - type: heat
+      to: 100
+      hysteresis: 2
+      bottom_threshold: 84
+      power: max
+    - type: hold
+      to: 100
+      hysteresis: 2
+      duration: 600s
+      power: medium
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 300s
+      power: low
+
+# ─── Cebolla Caramelizada ────────────────────────────────
+- name: "Cebolla Caramelizada"
+  description: "Cebolla caramelizada con pausas para remover"
+  stages:
+    - type: heat
+      to: 120
+      hysteresis: 3
+      power: high
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: high
+    - type: action
+      description: "Remueve la cebolla"
+      to: 110
+      hysteresis: 5
+      power: off
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: medium
+    - type: action
+      description: "Remueve la cebolla"
+      to: 110
+      hysteresis: 5
+      power: off
+    - type: hold
+      to: 110
+      hysteresis: 3
+      duration: 60min
+      power: low
+
+# ─── Reducción ──────────────────────────────────────
+- name: "Reducir 4h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 240min
+      power: high
+
+- name: "Reducir 2h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120min
+      power: high
+
+- name: "Reducir 1h"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 105
+      hysteresis: 5
+      duration: 120min
+      power: high
+
+# ─── Yogur ──────────────────────────────────────────────
+- name: "Yogur"
+  stages:
+    - type: hold
+      to: 43
+      hysteresis: 2
+      duration: 8h
+      power: gentle
+
+# ─── Recalentar ─────────────────────────────────────────
+- name: "Recalentar"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 75
+      hysteresis: 4
+      duration: 15min
+      power: medium
+
+# ─── Al Vapor ──────────────────────────────────────────
+- name: "Al Vapor"
+  next: "Mantener Caliente"
+  stages:
+    - type: heat
+      to: 100
+      hysteresis: 3
+      bottom_threshold: 89
+      power: max
+    - type: hold
+      to: 100
+      hysteresis: 2
+      duration: 30min
+      power: high
+    - type: hold
+      to: 85
+      hysteresis: 5
+      duration: 5min
+      power: low
+
+# ─── Congee ────────────────────────────────────────────
+- name: "Congee"
+  next: "Mantener Caliente"
+  stages:
+    - type: hold
+      to: 60
+      hysteresis: 5
+      duration: 300s
+      bottom_threshold: 130
+      power: max
+    - type: hold
+      to: 80
+      hysteresis: 3
+      duration: 1800s
+      bottom_threshold: 87
+      power: high
+    - type: hold
+      to: 100
+      hysteresis: 3
+      duration: 3600s
+      bottom_threshold: 130
+      power: high
+    - type: hold
+      to: 90
+      hysteresis: 3
+      duration: 900s
+      power: gentle
+
+# ─── Demo ────────────────────────────────────────────
+- name: "Test Completo"
+  description: "Prueba heat, hold, ramp. Encadena con Mantener Caliente"
+  next: "Mantener Caliente"
+  stages:
+    - type: heat          # TRANSITIONAL: avanza al alcanzar temp
+      to: 40
+      hysteresis: 3
+      power: medium
+    - type: hold          # TIMED_HOLD: mantiene temp por tiempo fijo
+      to: 40
+      hysteresis: 3
+      duration: 300s
+      power: medium
+    - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+      from: 40
+      to: 50
+      hysteresis: 3
+      duration: 600s
+      curve: linear
+      power: medium
+    - type: ramp          # RAMP: interpola de 60 a 80 en 30s
+      from: 50
+      to: 40
+      hysteresis: 3
+      duration: 600s
+      curve: linear
+      power: medium
+    - type: hold          # TIMED_HOLD: mantiene 80°C por 30s
+      to: 40
+      hysteresis: 3
+      duration: 300s
+      power: low
